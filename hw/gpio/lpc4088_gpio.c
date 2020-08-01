@@ -14,7 +14,7 @@
 #include "qemu/module.h"
 
 #ifndef DEBUG_LPC4088_GPIO
-#define DEBUG_LPC4088_GPIO 0
+#define DEBUG_LPC4088_GPIO 1
 #endif
 
 #define DPRINTF(fmt, args...) \
@@ -45,7 +45,7 @@ static void lpc4088_gpio_set(void *opaque, int line, int level)
 {
     LPC4088GPIOPortState *s = LPC4088_GPIO_PORT(opaque);
 
-    if(level) s->pin |= (1 << line)
+    if(level) s->pin |= (1 << line);
     else s->pin &= (1 << line);
 
     // TODO trigger interrupts
@@ -54,7 +54,7 @@ static void lpc4088_gpio_set(void *opaque, int line, int level)
 static inline void lpc4088_gpio_set_all_output_lines(LPC4088GPIOPortState *s)
 {
     int i;
-    for (i = 0; i < LPC4088GPIOPortState; i++)
+    for (i = 0; i < LPC4088_GPIO_PORT_PIN_COUNT; i++)
     {
         if(s->dir & (1 << i))
         {
@@ -152,8 +152,6 @@ static const VMStateDescription vmstate_lpc4088_gpio = {
         VMSTATE_UINT32(dir, LPC4088GPIOPortState),
         VMSTATE_UINT32(mask, LPC4088GPIOPortState),
         VMSTATE_UINT32(pin, LPC4088GPIOPortState),
-        VMSTATE_UINT32(set, LPC4088GPIOPortState),
-        VMSTATE_UINT32(clr, LPC4088GPIOPortState),
         VMSTATE_END_OF_LIST()
     }
 };
@@ -169,7 +167,8 @@ static void lpc4088_gpio_reset(DeviceState *dev)
     s->dir = 0;
     s->mask = 0;
     s->pin = 0;
-
+    lpc4088_gpio_set_all_output_lines(s);
+    
     // TODO interrupt initializations
 }
 

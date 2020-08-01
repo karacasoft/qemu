@@ -18,6 +18,7 @@
 #define TYPE_LPC4088_GPIO_PORT "lpc4088.gpioport"
 #define LPC4088_GPIO_PORT(obj) OBJECT_CHECK(LPC4088GPIOPortState, (obj), TYPE_LPC4088_GPIO_PORT)
 
+// TODO interupt registers must be implemented
 #define DIR_ADDR  0x00
 #define MASK_ADDR 0x10
 #define PIN_ADDR  0x14

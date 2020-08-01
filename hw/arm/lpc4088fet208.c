@@ -12,15 +12,27 @@
 #include "hw/qdev-properties.h"
 #include "sysemu/sysemu.h"
 
+#define NAME_SIZE 20
+
 static void lpc4088fet208_init(Object *obj)
 {
     LPC4088FET208State *s = LPC4088FET208(obj);
+    int i;
+    char name[NAME_SIZE];
 
     object_initialize_child(obj, "armv7m", &s->armv7m, TYPE_ARMV7M);
+
+    for (i = 0; i < LPC4088_NR_GPIO_PORTS; i++)
+    {
+        snprintf(name, NAME_SIZE, "gpio%d", i);
+        object_initialize_child(obj, name, &s->gpio[i],
+                                TYPE_LPC4088_GPIO_PORT);
+    }
 }
 
 static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 {
+    int i;
     LPC4088FET208State *s = LPC4088FET208(dev_soc);
     DeviceState *armv7m;
     //SysBusDevice *busdev;
@@ -44,6 +56,20 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
     qdev_prop_set_bit(armv7m, "enable-bitband", true);
     object_property_set_link(OBJECT(&s->armv7m), OBJECT(get_system_memory()),
             "memory", &error_abort);
+    
+    for (i = 0; i < LPC4088_NR_GPIO_PORTS; i++)
+    {
+        sysbus_realize(SYS_BUS_DEVICE(&s->gpio[i]), &err);
+        if (err)
+        {
+            error_propagate(errp, err);
+            return;
+        }
+
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->gpio[i]), 0,
+                LPC4088_GPIO_BASE_ADDR + 0x20 * i);
+    }
+
     sysbus_realize(SYS_BUS_DEVICE(&s->armv7m), &err);
     if(err != NULL)
     {
