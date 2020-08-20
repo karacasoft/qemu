@@ -12,6 +12,7 @@
 #include "hw/qdev-properties.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
+#include "trace.h"
 
 #ifndef DEBUG_LPC4088_GPIO
 #define DEBUG_LPC4088_GPIO 1
@@ -56,7 +57,7 @@ static inline void lpc4088_gpio_set_all_output_lines(LPC4088GPIOPortState *s)
     int i;
     for (i = 0; i < LPC4088_GPIO_PORT_PIN_COUNT; i++)
     {
-        if(s->dir & (1 << i))
+        if((s->dir & (1 << i)) && s->output[i])
         {
             qemu_set_irq(s->output[i], !!(s->pin & (1 < i)));
         }
@@ -93,6 +94,7 @@ static uint64_t lpc4088_gpio_read(void *opaque, hwaddr offset, unsigned size)
         break;
     }
 
+    trace_lpc4088_gpio_read(offset, reg_value);
     DPRINTF("(%s) = 0x%" PRIx32 "\n", lpc4088_gpio_reg_name(offset), reg_value);
 
     return reg_value;
@@ -106,6 +108,8 @@ static void lpc4088_gpio_write(void *opaque, hwaddr offset, uint64_t value,
     DPRINTF("(%s, value = 0x%" PRIx32 ")\n", lpc4088_gpio_reg_name(offset),
             (uint32_t) value);
     
+    trace_lpc4088_gpio_write(offset, value);
+
     switch (offset) {
     case DIR_ADDR:
         s->dir = value;
@@ -168,7 +172,7 @@ static void lpc4088_gpio_reset(DeviceState *dev)
     s->mask = 0;
     s->pin = 0;
     lpc4088_gpio_set_all_output_lines(s);
-    
+
     // TODO interrupt initializations
 }
 
