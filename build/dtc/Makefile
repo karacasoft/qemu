@@ -1,1 +1,0 @@
-/home/ubuntu/CmpE443_Qemu/qemu/dtc/Makefile
