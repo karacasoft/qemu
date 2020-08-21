@@ -37,3 +37,8 @@ common-obj-$(CONFIG_CMSDK_APB_TIMER) += cmsdk-apb-timer.o
 common-obj-$(CONFIG_CMSDK_APB_DUALTIMER) += cmsdk-apb-dualtimer.o
 common-obj-$(CONFIG_MSF2) += mss-timer.o
 common-obj-$(CONFIG_RASPI) += bcm2835_systmr.o
+
+common-obj-$(CONFIG_LPC4088_DEV_BOARD) += lpc4088_timer.o
+common-obj-$(CONFIG_LPC4088_DEV_BOARD) += lpc4088_pwm.o
+
+
