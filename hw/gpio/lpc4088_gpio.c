@@ -46,8 +46,14 @@ static void lpc4088_gpio_set(void *opaque, int line, int level)
 {
     LPC4088GPIOPortState *s = LPC4088_GPIO_PORT(opaque);
 
-    if(level) s->pin |= (1 << line);
-    else s->pin &= (1 << line);
+    if(level)
+    {
+        s->pin |= (1 << line);
+    }
+    else
+    {
+        s->pin &= (1 << line);
+    }
 
     // TODO trigger interrupts
 }
