@@ -42,6 +42,8 @@ static void lpc4088_adc_reset(DeviceState *dev)
 	s->adc_ADTRM = 0x00000000;
 }
 
+static uint32_t lpc4088_adc_generate_value(LPC4088ADCState *s) __attribute__((unused));
+
 static uint32_t lpc4088_adc_generate_value(LPC4088ADCState *s)
 {
     /* Attempts to fake some ADC values */

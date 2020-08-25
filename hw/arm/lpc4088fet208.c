@@ -97,7 +97,8 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 	
 	
 	for (i = 0; i < LPC4088_NR_USARTS; i++) {
-		qdev_prop_set_chr(SYS_BUS_DEVICE(&s->usart[i]), "chardev", serial_hd(i));
+        
+		qdev_prop_set_chr(DEVICE(&s->usart[i]), "chardev", serial_hd(i));
         sysbus_realize(SYS_BUS_DEVICE(&s->usart[i]), &err);
 		
         if (err) {
@@ -107,7 +108,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 		
 		sysbus_mmio_map(SYS_BUS_DEVICE(&s->usart[i]), 0, usart_addresses[i]);
 		
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->usart[i]), 0, qdev_get_gpio_in(SYS_BUS_DEVICE(&s->armv7m), usart_irq[i]));
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->usart[i]), 0, qdev_get_gpio_in(DEVICE(&s->armv7m), usart_irq[i]));
     }
 	
     for (i = 0; i < LPC4088_NR_GPIO_PORTS; i++)
@@ -125,7 +126,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 	
 	for (i = 0; i < LPC4088_NR_TIMERS; i++) {
 		
-        qdev_prop_set_uint64(SYS_BUS_DEVICE(&s->timer[i]), "clock-frequency", 1000000000);
+        qdev_prop_set_uint64(DEVICE(&s->timer[i]), "clock-frequency", 1000000000);
         sysbus_realize(SYS_BUS_DEVICE(&s->timer[i]), &err);
 		
         if (err) {
@@ -135,12 +136,12 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 		
 		sysbus_mmio_map(SYS_BUS_DEVICE(&s->timer[i]), 0, timer_addresses[i]);
 		
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->timer[i]), 0, qdev_get_gpio_in(SYS_BUS_DEVICE(&s->armv7m), timer_irq[i]));
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->timer[i]), 0, qdev_get_gpio_in(DEVICE(&s->armv7m), timer_irq[i]));
     }
 	
 	for (i = 0; i < LPC4088_NR_PWMS; i++) {
 		
-        qdev_prop_set_uint64(SYS_BUS_DEVICE(&s->pwm[i]), "clock-frequency", 1000000000);
+        qdev_prop_set_uint64(DEVICE(&s->pwm[i]), "clock-frequency", 1000000000);
         sysbus_realize(SYS_BUS_DEVICE(&s->pwm[i]), &err);
 		
         if (err) {
@@ -150,7 +151,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 		
 		sysbus_mmio_map(SYS_BUS_DEVICE(&s->pwm[i]), 0, pwm_addresses[i]);
 		
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->pwm[i]), 0, qdev_get_gpio_in(SYS_BUS_DEVICE(&s->armv7m), pwm_irq[i]));
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->pwm[i]), 0, qdev_get_gpio_in(DEVICE(&s->armv7m), pwm_irq[i]));
     }
 	
 	for (i = 0; i < LPC4088_NR_ADCS; i++) {							
@@ -163,7 +164,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 		
 		sysbus_mmio_map(SYS_BUS_DEVICE(&s->adc[i]), 0, adc_addresses[i]);
 		
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->adc[i]), 0, qdev_get_gpio_in(SYS_BUS_DEVICE(&s->armv7m), adc_irq[i]));
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->adc[i]), 0, qdev_get_gpio_in(DEVICE(&s->armv7m), adc_irq[i]));
     }
 	
     sysbus_realize(SYS_BUS_DEVICE(&s->armv7m), &err);
