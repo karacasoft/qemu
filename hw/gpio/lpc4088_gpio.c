@@ -178,7 +178,6 @@ static void lpc4088_gpio_reset(DeviceState *dev)
     s->mask = 0;
     s->pin = 0;
     lpc4088_gpio_set_all_output_lines(s);
-
     // TODO interrupt initializations
 }
 
