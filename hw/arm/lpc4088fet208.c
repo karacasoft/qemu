@@ -11,6 +11,8 @@
 #include "hw/arm/lpc4088fet208.h"
 #include "hw/qdev-properties.h"
 #include "sysemu/sysemu.h"
+#include "hw/qdev-core.h"
+#include "hw/qdev-properties.h"
 
 static const uint32_t timer_addresses[LPC4088_NR_TIMERS] = { 0x40004000, 0x40008000,
     0x40090000, 0x40094000 };
@@ -24,6 +26,8 @@ static const int timer_irq[LPC4088_NR_TIMERS] = {17, 18, 19, 20};
 static const int pwm_irq[LPC4088_NR_PWMS] = {55, 25};
 static const int adc_irq[LPC4088_NR_ADCS] = {38};
 static const int usart_irq[LPC4088_NR_USARTS] = {21, 22, 23, 24, 51};
+
+static const char *gpio_names[] = { "0", "1", "2", "3", "4", "5" };
 
 #define NAME_SIZE 20
 
@@ -94,7 +98,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
     object_property_set_link(OBJECT(&s->armv7m), OBJECT(get_system_memory()),
             "memory", &error_abort);
     
-	
+	sysbus_realize(SYS_BUS_DEVICE(&s->armv7m), &err);
 	
 	for (i = 0; i < LPC4088_NR_USARTS; i++) {
         
@@ -113,7 +117,10 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 	
     for (i = 0; i < LPC4088_NR_GPIO_PORTS; i++)
     {
+        qdev_prop_set_string(DEVICE(&s->gpio[i]), "port-name", gpio_names[i]);
+        qdev_prop_set_bit(DEVICE(&s->gpio[i]), "enable-rc", true);
         sysbus_realize(SYS_BUS_DEVICE(&s->gpio[i]), &err);
+        
         if (err)
         {
             error_propagate(errp, err);
@@ -167,7 +174,6 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->adc[i]), 0, qdev_get_gpio_in(DEVICE(&s->armv7m), adc_irq[i]));
     }
 	
-    sysbus_realize(SYS_BUS_DEVICE(&s->armv7m), &err);
     if(err != NULL)
     {
         error_propagate(errp, err);
