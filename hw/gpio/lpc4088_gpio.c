@@ -21,9 +21,10 @@
 #endif
 
 #define REMOTE_CTRL_GPIO_MAGIC 0xDEADBEE2
-#define REMOTE_CTRL_CMD_GPIO_SET_PORT_PIN 0x00000100
-#define REMOTE_CTRL_CMD_GPIO_CLR_PORT_PIN 0x00000200
-#define REMOTE_CTRL_CMD_GPIO_STATUS       0x00000300
+#define REMOTE_CTRL_CMD_GPIO_SET_PORT_PIN   0x00000100
+#define REMOTE_CTRL_CMD_GPIO_SET_PORT_VALUE 0x00000101
+#define REMOTE_CTRL_CMD_GPIO_CLR_PORT_PIN   0x00000200
+#define REMOTE_CTRL_CMD_GPIO_STATUS         0x00000300
 
 #define DPRINTF(fmt, args...) \
     if(DEBUG_LPC4088_GPIO) { \
@@ -200,7 +201,7 @@ static Property lpc4088_gpio_properties[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
-static void lpc4088_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlMessage *msg)
+static void lpc4088_gpio_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlMessage *msg)
 {
     LPC4088GPIOPortState *s = LPC4088_GPIO_PORT(rcs->connected_device);
     if(s->enable_rc)
@@ -262,7 +263,7 @@ static void lpc4088_gpio_realize(DeviceState *dev, Error **errp)
 
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
 
-    s->rcs.callback = lpc4088_remote_ctrl_callback;
+    s->rcs.callback = lpc4088_gpio_remote_ctrl_callback;
     qdev_realize(DEVICE(&s->rcs), qdev_get_parent_bus(DEVICE(&s->rcs)), errp);
     
 }

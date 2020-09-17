@@ -3,6 +3,7 @@
 
 #include "hw/sysbus.h"
 #include "qemu/timer.h"
+#include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_PWM "lpc4088-pwm"
 
@@ -67,6 +68,9 @@ typedef struct LPC4088PWMState {
 	uint32_t pwm_PCR;
 	uint32_t pwm_LER;
 	uint32_t pwm_CTCR;
+
+	bool enable_rc;
+	RemoteCtrlState rcs;
 	
 } LPC4088PWMState;
 

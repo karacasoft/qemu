@@ -5,10 +5,13 @@
 #include "migration/vmstate.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
+#include "qapi/error.h"
 
 #ifndef LPC4088_PWM_ERR_DEBUG
 #define LPC4088_PWM_ERR_DEBUG 1
 #endif
+
+#define REMOTE_CTRL_PWM_MAGIC 0xEADDBEE3
 
 #define DB_PRINT_L(lvl, fmt, args...) do { \
     if (LPC4088_PWM_ERR_DEBUG >= lvl) { \
@@ -293,12 +296,23 @@ static const VMStateDescription vmstate_lpc4088_pwm = {
 static Property lpc4088_pwm_properties[] = {
     DEFINE_PROP_UINT64("clock-frequency", struct LPC4088PWMState,
                        freq_hz, 1000000000),
+    DEFINE_PROP_BOOL("enable-rc", LPC4088PWMState, enable_rc, false),
     DEFINE_PROP_END_OF_LIST(),
 };
+
+static void lpc4088_pwm_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlMessage *msg)
+{
+    LPC4088PWMState *s = LPC4088PWM(rcs->connected_device);
+    if(s->enable_rc)
+    {
+        // TODO commands falan
+    }
+}
 
 static void lpc4088_pwm_init(Object *obj)
 {
     LPC4088PWMState *s = LPC4088PWM(obj);
+    DeviceState *ds = DEVICE(obj);
 
     sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
 
@@ -306,12 +320,23 @@ static void lpc4088_pwm_init(Object *obj)
                           TYPE_LPC4088_PWM, LPC4088_PWM_MEM_SIZE);
 						  
     sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->iomem);
+
+    object_initialize_child_with_props(
+        obj, "RemoteCtrl", &s->rcs,
+        sizeof(RemoteCtrlState), TYPE_REMOTE_CTRL, &error_abort,
+        NULL
+    );
+
+    s->rcs.connected_device = ds;
 }
 
 static void lpc4088_pwm_realize(DeviceState *dev, Error **errp)
 {
     LPC4088PWMState *s = LPC4088PWM(dev);
     s->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, lpc4088_pwm_interrupt, s);
+
+    s->rcs.callback = lpc4088_pwm_remote_ctrl_callback;
+    qdev_realize(DEVICE(&s->rcs), qdev_get_parent_bus(DEVICE(&s->rcs)), errp);
 }
 
 static void lpc4088_pwm_class_init(ObjectClass *klass, void *data)
