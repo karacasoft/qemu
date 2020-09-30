@@ -28,6 +28,12 @@
 
 #define IRQ(obj) OBJECT_CHECK(struct IRQState, (obj), TYPE_IRQ)
 
+#ifndef IRQ_ERROR_DEBUG
+#define IRQ_ERROR_DEBUG 0
+#endif
+
+#define DEBUG_PRINT(fmt, args...) if(IRQ_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_IRQ,__func__, ##args);}
+
 struct IRQState {
     Object parent_obj;
 
@@ -37,10 +43,14 @@ struct IRQState {
 };
 
 void qemu_set_irq(qemu_irq irq, int level)
-{
-    if (!irq)
+{	
+    if (!irq) {
         return;
-
+	}
+	
+	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","IRQ_Type",(uint32_t) irq->n);
+	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","IRQ_Level",(uint32_t) level);
+	
     irq->handler(irq->opaque, irq->n, level);
 }
 
