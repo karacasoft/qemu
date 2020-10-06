@@ -56,6 +56,12 @@
 #define LPC4088_SC_REG_EMCDLYCTL 0x1DC
 #define LPC4088_SC_REG_EMCCALd 0x1E0
 
+typedef enum LPC4088PLLFEEDState {
+	PLL_FEED_STATE_DEFAULT = 0,
+	PLL_FEED_STATE_FEED1,
+	PLL_FEED_STATE_FEED2
+} LPC4088PLLFEEDState;
+
 typedef struct LPC4088SCState {
     /* <private> */
     SysBusDevice parent_obj;
@@ -63,12 +69,15 @@ typedef struct LPC4088SCState {
     /* <public> */
     MemoryRegion mmio;
 
+	LPC4088PLLFEEDState pll0_feed_state;
+	LPC4088PLLFEEDState pll1_feed_state;
+
 	uint32_t sc_FLASHCFG;
 	
 	uint32_t sc_PLL0CON;
 	uint32_t sc_PLL0CFG;
 	uint32_t sc_PLL0STAT;
-	uint32_t sc_PLL0FEED;
+
 	
 	uint32_t sc_PLL1CON;
 	uint32_t sc_PLL1CFG;
@@ -93,6 +102,7 @@ typedef struct LPC4088SCState {
 	uint32_t sc_RSID;
 	
 	uint32_t sc_SCS;
+	uint32_t sc_IRCCTRL;
 	uint32_t sc_IRCTRIM;
 	uint32_t sc_PCLKSEL;
 	

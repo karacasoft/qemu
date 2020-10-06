@@ -14,26 +14,29 @@
 static void lpc4088_sc_reset(DeviceState *dev) {
     LPC4088SCState *s = LPC4088SC(dev);
 	
+	s->pll0_feed_state = PLL_FEED_STATE_DEFAULT;
+	s->pll1_feed_state = PLL_FEED_STATE_DEFAULT;
+
 	s->sc_FLASHCFG = 0x00000000;
 	
 	s->sc_PLL0CON = 0x00000000;
 	s->sc_PLL0CFG = 0x00000000;
 	s->sc_PLL0STAT = 0x00000000;
-	s->sc_PLL0FEED = 0x00000000;
+	
 	
 	s->sc_PLL1CON = 0x00000000;
 	s->sc_PLL1CFG = 0x00000000;
 	s->sc_PLL1STAT = 0x00000000;
-	s->sc_PLL1FEED = 0x00000000;
 	
 	s->sc_PCON = 0x00000000;
-	s->sc_PCONP = 0x00000000;
-	s->sc_PCONP1 = 0x00000000;
+	s->sc_PCONP = 0x408829E;
+	s->sc_PCONP1 = 0x8;
 	
 	s->sc_EMCCLKSEL = 0x00000000;
-	s->sc_CCLKSEL = 0x00000000;
+	s->sc_CCLKSEL = 0x1;
 	s->sc_USBCLKSEL = 0x00000000;
 	s->sc_CLKSRCSEL = 0x00000000;
+
 	s->sc_CANSLEEPCLR = 0x00000000;
 	s->sc_CANWAKEFLAGS = 0x00000000;
 	
@@ -44,21 +47,22 @@ static void lpc4088_sc_reset(DeviceState *dev) {
 	s->sc_RSID = 0x00000000;
 	
 	s->sc_SCS = 0x00000000;
+	s->sc_IRCCTRL = 0x80;
 	s->sc_IRCTRIM = 0x00000000;
-	s->sc_PCLKSEL = 0x00000000;
+	s->sc_PCLKSEL = 0x4;
 	
-	s->sc_PBOOST = 0x00000000;
+	s->sc_PBOOST = 0x3;
 	s->sc_SPIFICLKSEL = 0x00000000;
 	s->sc_LCD_CFG = 0x00000000;
 	
-	s->sc_USBIntSt = 0x00000000;
+	s->sc_USBIntSt = 0x80000000;
 	s->sc_DMAREQSEL = 0x00000000;
 	s->sc_CLKOUTCFG = 0x00000000;
 	s->sc_RSTCON0 = 0x00000000;
 	s->sc_RSTCON1 = 0x00000000;
 
-	s->sc_EMCDLYCTL = 0x00000000;
-	s->sc_EMCCALd = 0x00000000;
+	s->sc_EMCDLYCTL = 0x210;
+	s->sc_EMCCALd = 0x1F00;
 }
 
 static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
