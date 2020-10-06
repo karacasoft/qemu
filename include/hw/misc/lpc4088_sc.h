@@ -120,6 +120,9 @@ typedef struct LPC4088SCState {
 	uint32_t sc_EMCCALd;
 	
     qemu_irq irq;
+	
+	qemu_irq hard_fault_irq;
+
 } LPC4088SCState;
 
 #endif /* __LPC4088_SC_H__ */
