@@ -27,6 +27,15 @@ static const int usart_irq[LPC4088_NR_USARTS] = {21, 22, 23, 24, 51};
 
 #define NAME_SIZE 20
 
+static void lpc4088fet208_trigger_hard_fault(void *opaque, int n, int level)
+{
+    LPC4088FET208State *s = LPC4088FET208(opaque);
+    if(level)
+    {
+        cpu_interrupt(CPU(s->armv7m.cpu), CPU_INTERRUPT_HARD);
+    }
+}
+
 static void lpc4088fet208_init(Object *obj)
 {
     LPC4088FET208State *s = LPC4088FET208(obj);
@@ -34,6 +43,7 @@ static void lpc4088fet208_init(Object *obj)
     char name[NAME_SIZE];
 
     object_initialize_child(obj, "armv7m", &s->armv7m, TYPE_ARMV7M);
+    object_initialize_child(obj, "syscon", &s->syscon, TYPE_LPC4088_SC);
 
     for (i = 0; i < LPC4088_NR_GPIO_PORTS; i++)
     {
@@ -65,6 +75,8 @@ static void lpc4088fet208_init(Object *obj)
         object_initialize_child(obj, name, &s->usart[i],
                                 TYPE_LPC4088_USART);
     }
+
+    sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->hardfault_input_irq);
 }
 
 static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
@@ -87,6 +99,8 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
             LPC4088FET208_SRAM_SIZE, &error_fatal);
     memory_region_add_subregion(system_memory, LPC4088FET208_SRAM_BASE_ADDRESS, sram);
 
+    qdev_init_gpio_in(dev_soc, lpc4088fet208_trigger_hard_fault, 1);
+
     armv7m = DEVICE(&s->armv7m);
     qdev_prop_set_uint32(armv7m, "num-irq", 56);//LPC4088 56
     qdev_prop_set_string(armv7m, "cpu-type", s->cpu_type);
@@ -94,12 +108,26 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
     object_property_set_link(OBJECT(&s->armv7m), OBJECT(get_system_memory()),
             "memory", &error_abort);
     
+
 	sysbus_realize(SYS_BUS_DEVICE(&s->armv7m), &err);
     if(err != NULL)
     {
         error_propagate(errp, err);
         return;
     }
+
+
+    //////////////////////// SYSCON //////////////////////////////
+    sysbus_realize(SYS_BUS_DEVICE(&s->syscon), &err);
+    if(err != NULL)
+    {
+        error_propagate(errp, err);
+        return;
+    }
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->syscon), 0, 0x400FC000);
+
+    qdev_connect_gpio_out_named(DEVICE(&s->syscon), "HardFaultIRQ", 1, s->hardfault_input_irq);
+    ///////////////////////// SYSCON /////////////////////////////
 	
 	for (i = 0; i < LPC4088_NR_USARTS; i++) {
 		dev = DEVICE(&(s->usart[i]));

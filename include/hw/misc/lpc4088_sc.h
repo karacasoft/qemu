@@ -5,7 +5,7 @@
 
 #define TYPE_LPC4088_SC "lpc4088-sc"
 
-#define LPC4088SC(obj) OBJECT_CHECK(LPC4088SCState, (obj), TYPE_LPC4088_SC)
+#define LPC4088_SC(obj) OBJECT_CHECK(LPC4088SCState, (obj), TYPE_LPC4088_SC)
 
 #define LPC4088_SC_MEM_SIZE 0x200
 
@@ -56,11 +56,9 @@
 #define LPC4088_SC_REG_EMCDLYCTL 0x1DC
 #define LPC4088_SC_REG_EMCCALd 0x1E0
 
-typedef enum LPC4088PLLFEEDState {
-	PLL_FEED_STATE_DEFAULT = 0,
-	PLL_FEED_STATE_FEED1,
-	PLL_FEED_STATE_FEED2
-} LPC4088PLLFEEDState;
+#define PLL_FEED_STATE_DEFAULT 0
+#define PLL_FEED_STATE_FEED1 1
+#define PLL_FEED_STATE_FEED2 2
 
 typedef struct LPC4088SCState {
     /* <private> */
@@ -69,8 +67,8 @@ typedef struct LPC4088SCState {
     /* <public> */
     MemoryRegion mmio;
 
-	LPC4088PLLFEEDState pll0_feed_state;
-	LPC4088PLLFEEDState pll1_feed_state;
+	uint8_t pll0_feed_state;
+	uint8_t pll1_feed_state;
 
 	uint32_t sc_FLASHCFG;
 	
