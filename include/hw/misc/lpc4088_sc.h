@@ -5,7 +5,7 @@
 
 #define TYPE_LPC4088_SC "lpc4088-sc"
 
-#define LPC4088SC(obj) OBJECT_CHECK(LPC4088SCState, (obj), TYPE_LPC4088_SC)
+#define LPC4088_SC(obj) OBJECT_CHECK(LPC4088SCState, (obj), TYPE_LPC4088_SC)
 
 #define LPC4088_SC_MEM_SIZE 0x200
 
@@ -56,6 +56,10 @@
 #define LPC4088_SC_REG_EMCDLYCTL 0x1DC
 #define LPC4088_SC_REG_EMCCALd 0x1E0
 
+#define PLL_FEED_STATE_DEFAULT 0
+#define PLL_FEED_STATE_FEED1 1
+#define PLL_FEED_STATE_FEED2 2
+
 typedef struct LPC4088SCState {
     /* <private> */
     SysBusDevice parent_obj;
@@ -63,12 +67,15 @@ typedef struct LPC4088SCState {
     /* <public> */
     MemoryRegion mmio;
 
+	uint8_t pll0_feed_state;
+	uint8_t pll1_feed_state;
+
 	uint32_t sc_FLASHCFG;
 	
 	uint32_t sc_PLL0CON;
 	uint32_t sc_PLL0CFG;
 	uint32_t sc_PLL0STAT;
-	uint32_t sc_PLL0FEED;
+
 	
 	uint32_t sc_PLL1CON;
 	uint32_t sc_PLL1CFG;
@@ -93,6 +100,7 @@ typedef struct LPC4088SCState {
 	uint32_t sc_RSID;
 	
 	uint32_t sc_SCS;
+	uint32_t sc_IRCCTRL;
 	uint32_t sc_IRCTRIM;
 	uint32_t sc_PCLKSEL;
 	
@@ -110,6 +118,9 @@ typedef struct LPC4088SCState {
 	uint32_t sc_EMCCALd;
 	
     qemu_irq irq;
+	
+	qemu_irq hard_fault_irq;
+
 } LPC4088SCState;
 
 #endif /* __LPC4088_SC_H__ */

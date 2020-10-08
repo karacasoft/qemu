@@ -14,6 +14,7 @@
 #include "hw/timer/lpc4088_pwm.h"
 #include "hw/adc/lpc4088_adc.h"
 #include "hw/char/lpc4088_usart.h"
+#include "hw/misc/lpc4088_sc.h"
 
 #define TYPE_LPC4088FET208 "lpc4088fet208"
 #define LPC4088FET208(obj) \
@@ -41,11 +42,15 @@ typedef struct LPC4088FET208State {
     char *cpu_type;
     ARMv7MState armv7m;
 
+    LPC4088SCState syscon;
+
     LPC4088GPIOPortState gpio[LPC4088_NR_GPIO_PORTS];
 	LPC4088TimerState timer[LPC4088_NR_TIMERS];
 	LPC4088PWMState pwm[LPC4088_NR_PWMS];
 	LPC4088ADCState adc[LPC4088_NR_ADCS];
 	LPC4088USARTState usart[LPC4088_NR_USARTS];
+
+    qemu_irq hardfault_input_irq;
 
 } LPC4088FET208State;
 

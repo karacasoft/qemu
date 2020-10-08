@@ -3,7 +3,10 @@
 #include "migration/vmstate.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
+#include "hw/irq.h"
 #include "hw/misc/lpc4088_sc.h"
+#include "hw/qdev-properties.h"
+#include "hw/qdev-core.h"
 
 #ifndef LPC4088_SC_ERROR_DEBUG
 #define LPC4088_SC_ERROR_DEBUG 0
@@ -12,28 +15,31 @@
 #define DEBUG_PRINT(fmt, args...) if(LPC4088_SC_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_SC,__func__, ##args);}
 
 static void lpc4088_sc_reset(DeviceState *dev) {
-    LPC4088SCState *s = LPC4088SC(dev);
+    LPC4088SCState *s = LPC4088_SC(dev);
 	
+	s->pll0_feed_state = PLL_FEED_STATE_DEFAULT;
+	s->pll1_feed_state = PLL_FEED_STATE_DEFAULT;
+
 	s->sc_FLASHCFG = 0x00000000;
 	
 	s->sc_PLL0CON = 0x00000000;
 	s->sc_PLL0CFG = 0x00000000;
 	s->sc_PLL0STAT = 0x00000000;
-	s->sc_PLL0FEED = 0x00000000;
+	
 	
 	s->sc_PLL1CON = 0x00000000;
 	s->sc_PLL1CFG = 0x00000000;
 	s->sc_PLL1STAT = 0x00000000;
-	s->sc_PLL1FEED = 0x00000000;
 	
 	s->sc_PCON = 0x00000000;
-	s->sc_PCONP = 0x00000000;
-	s->sc_PCONP1 = 0x00000000;
+	s->sc_PCONP = 0x408829E;
+	s->sc_PCONP1 = 0x8;
 	
 	s->sc_EMCCLKSEL = 0x00000000;
-	s->sc_CCLKSEL = 0x00000000;
+	s->sc_CCLKSEL = 0x1;
 	s->sc_USBCLKSEL = 0x00000000;
 	s->sc_CLKSRCSEL = 0x00000000;
+
 	s->sc_CANSLEEPCLR = 0x00000000;
 	s->sc_CANWAKEFLAGS = 0x00000000;
 	
@@ -44,25 +50,26 @@ static void lpc4088_sc_reset(DeviceState *dev) {
 	s->sc_RSID = 0x00000000;
 	
 	s->sc_SCS = 0x00000000;
+	s->sc_IRCCTRL = 0x80;
 	s->sc_IRCTRIM = 0x00000000;
-	s->sc_PCLKSEL = 0x00000000;
+	s->sc_PCLKSEL = 0x4;
 	
-	s->sc_PBOOST = 0x00000000;
+	s->sc_PBOOST = 0x3;
 	s->sc_SPIFICLKSEL = 0x00000000;
 	s->sc_LCD_CFG = 0x00000000;
 	
-	s->sc_USBIntSt = 0x00000000;
+	s->sc_USBIntSt = 0x80000000;
 	s->sc_DMAREQSEL = 0x00000000;
 	s->sc_CLKOUTCFG = 0x00000000;
 	s->sc_RSTCON0 = 0x00000000;
 	s->sc_RSTCON1 = 0x00000000;
 
-	s->sc_EMCDLYCTL = 0x00000000;
-	s->sc_EMCCALd = 0x00000000;
+	s->sc_EMCDLYCTL = 0x210;
+	s->sc_EMCCALd = 0x1F00;
 }
 
 static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
-    LPC4088SCState *s = opaque;
+    LPC4088SCState *s = LPC4088_SC(opaque);
 
     switch (addr) {
     case LPC4088_SC_FLASHCFG:
@@ -74,7 +81,9 @@ static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
 	case LPC4088_SC_REG_PLL0STAT:
 		return s->sc_PLL0STAT;
 	case LPC4088_SC_REG_PLL0FEED:
-		return s->sc_PLL0FEED;
+		// TODO hard fault??
+		qemu_set_irq(s->hard_fault_irq, 1);
+		return 0;
 	case LPC4088_SC_REG_PLL1CON:
 		return s->sc_PLL1CON;
 	case LPC4088_SC_REG_PLL1CFG:
@@ -82,7 +91,8 @@ static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
 	case LPC4088_SC_REG_PLL1STAT:
 		return s->sc_PLL1STAT;
 	case LPC4088_SC_REG_PLL1FEED:
-		return s->sc_PLL1FEED;
+		// TODO hard fault??
+		return 0;
 	case LPC4088_SC_REG_PCON:
 		return s->sc_PCON;
 	case LPC4088_SC_REG_PCONP:
@@ -143,7 +153,7 @@ static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
 }
 
 static void lpc4088_sc_write(void *opaque, hwaddr addr, uint64_t val64, unsigned int size) {
-    LPC4088SCState *s = opaque;
+    LPC4088SCState *s = LPC4088_SC(opaque);
     uint32_t value = (uint32_t) val64;
 			 
 	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","SC_Write",(uint32_t) value);
@@ -162,7 +172,7 @@ static void lpc4088_sc_write(void *opaque, hwaddr addr, uint64_t val64, unsigned
 		s->sc_PLL0STAT = value;
 		break;
 	case LPC4088_SC_REG_PLL0FEED:
-		s->sc_PLL0FEED = value;
+		// TODO implement feed logic
 		break;
 	case LPC4088_SC_REG_PLL1CON:
 		s->sc_PLL1CON = value;
@@ -174,7 +184,7 @@ static void lpc4088_sc_write(void *opaque, hwaddr addr, uint64_t val64, unsigned
 		s->sc_PLL1STAT = value;
 		break;
 	case LPC4088_SC_REG_PLL1FEED:
-		s->sc_PLL1FEED = value;
+		// TODO implement feed logic
 		break;
 	case LPC4088_SC_REG_PCON:
 		s->sc_PCON = value;
@@ -272,34 +282,35 @@ static const VMStateDescription vmstate_lpc4088_sc = {
     .version_id = 1,
     .minimum_version_id = 1,
     .fields = (VMStateField[]) {
-        VMSTATE_UINT32(sc_FLASHCFG, LPC4088SCState),	
+        VMSTATE_UINT32(sc_FLASHCFG, LPC4088SCState),
 		VMSTATE_UINT32(sc_PLL0CON, LPC4088SCState),
 		VMSTATE_UINT32(sc_PLL0CFG, LPC4088SCState),
 		VMSTATE_UINT32(sc_PLL0STAT, LPC4088SCState),
-		VMSTATE_UINT32(sc_PLL0FEED, LPC4088SCState),		
+		VMSTATE_UINT8(pll0_feed_state, LPC4088SCState),
 		VMSTATE_UINT32(sc_PLL1CON, LPC4088SCState),
 		VMSTATE_UINT32(sc_PLL1CFG, LPC4088SCState),
 		VMSTATE_UINT32(sc_PLL1STAT, LPC4088SCState),
-		VMSTATE_UINT32(sc_PLL1FEED, LPC4088SCState),		
+		VMSTATE_UINT8(pll1_feed_state, LPC4088SCState),
 		VMSTATE_UINT32(sc_PCON, LPC4088SCState),
 		VMSTATE_UINT32(sc_PCONP, LPC4088SCState),
-		VMSTATE_UINT32(sc_PCONP1, LPC4088SCState),		
+		VMSTATE_UINT32(sc_PCONP1, LPC4088SCState),
 		VMSTATE_UINT32(sc_EMCCLKSEL, LPC4088SCState),
 		VMSTATE_UINT32(sc_CCLKSEL, LPC4088SCState),
 		VMSTATE_UINT32(sc_USBCLKSEL, LPC4088SCState),
 		VMSTATE_UINT32(sc_CLKSRCSEL, LPC4088SCState),
 		VMSTATE_UINT32(sc_CANSLEEPCLR, LPC4088SCState),
-		VMSTATE_UINT32(sc_CANWAKEFLAGS, LPC4088SCState),		
+		VMSTATE_UINT32(sc_CANWAKEFLAGS, LPC4088SCState),
 		VMSTATE_UINT32(sc_EXTINT, LPC4088SCState),
 		VMSTATE_UINT32(sc_EXTMODE, LPC4088SCState),
-		VMSTATE_UINT32(sc_EXTPOLAR, LPC4088SCState),		
-		VMSTATE_UINT32(sc_RSID, LPC4088SCState),		
+		VMSTATE_UINT32(sc_EXTPOLAR, LPC4088SCState),
+		VMSTATE_UINT32(sc_RSID, LPC4088SCState),
 		VMSTATE_UINT32(sc_SCS, LPC4088SCState),
+		VMSTATE_UINT32(sc_IRCCTRL, LPC4088SCState),
 		VMSTATE_UINT32(sc_IRCTRIM, LPC4088SCState),
-		VMSTATE_UINT32(sc_PCLKSEL, LPC4088SCState),		
+		VMSTATE_UINT32(sc_PCLKSEL, LPC4088SCState),
 		VMSTATE_UINT32(sc_PBOOST, LPC4088SCState),
 		VMSTATE_UINT32(sc_SPIFICLKSEL, LPC4088SCState),
-		VMSTATE_UINT32(sc_LCD_CFG, LPC4088SCState),		
+		VMSTATE_UINT32(sc_LCD_CFG, LPC4088SCState),
 		VMSTATE_UINT32(sc_USBIntSt, LPC4088SCState),
 		VMSTATE_UINT32(sc_DMAREQSEL, LPC4088SCState),
 		VMSTATE_UINT32(sc_CLKOUTCFG, LPC4088SCState),
@@ -312,20 +323,36 @@ static const VMStateDescription vmstate_lpc4088_sc = {
 };
 
 static void lpc4088_sc_init(Object *obj) {
-    LPC4088SCState *s = LPC4088SC(obj);
+    LPC4088SCState *s = LPC4088_SC(obj);
 
     sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
+	sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->hard_fault_irq);
 
     memory_region_init_io(&s->mmio, obj, &lpc4088_sc_ops, s,TYPE_LPC4088_SC, LPC4088_SC_MEM_SIZE);
     sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);
 }
 
+static Property lpc4088_sc_properties[] = {
+	DEFINE_PROP_END_OF_LIST(),
+};
+
+static void lpc4088_sc_realize(DeviceState *dev, Error **errp)
+{
+	LPC4088SCState *s = LPC4088_SC(dev);
+	qdev_init_gpio_out_named(DEVICE(dev), &s->hard_fault_irq, "HardFaultIRQ", 1);
+}
+
 static void lpc4088_sc_class_init(ObjectClass *klass, void *data) {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
+	device_class_set_props(dc, lpc4088_sc_properties);
+
+	dc->realize = lpc4088_sc_realize;
     dc->reset = lpc4088_sc_reset;
     dc->vmsd = &vmstate_lpc4088_sc;
 }
+
+
 
 static const TypeInfo lpc4088_sc_info = {
     .name          = TYPE_LPC4088_SC,
