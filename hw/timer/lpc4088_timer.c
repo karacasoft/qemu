@@ -6,75 +6,130 @@
 #include "qemu/log.h"
 #include "qemu/module.h"
 
-#ifndef LPC4088_TIMER_ERR_DEBUG
-#define LPC4088_TIMER_ERR_DEBUG 1
+#ifndef LPC4088_TIMER_ERROR_DEBUG
+#define LPC4088_TIMER_ERROR_DEBUG 1
 #endif
 
-#define DB_PRINT_L(lvl, fmt, args...) do { \
-    if (LPC4088_TIMER_ERR_DEBUG >= lvl) { \
-        qemu_log("%s: " fmt, __func__, ## args); \
-    } \
-} while (0)
+#define DEBUG_PRINT(fmt, args...) if(LPC4088_TIMER_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_TIMER,__func__, ##args);}
 
-#define DB_PRINT(fmt, args...) DB_PRINT_L(1, fmt, ## args)
-
-#define DPRINTF2(fmt, args...) \
-    if(LPC4088_TIMER_ERR_DEBUG) { \
-        fprintf(stderr, "[%s]%s: " fmt, TYPE_LPC4088_TIMER, \
-                __func__, ##args); \
+static const char *lpc4088_timer_register_name(uint32_t offset) {
+	switch (offset) {
+    case LPC4088_TIMER_REG_IR:
+        return "Timer IR";
+    case LPC4088_TIMER_REG_TCR:
+        return "Timer TCR";
+    case LPC4088_TIMER_REG_TC:
+		return "Timer TC";
+	case LPC4088_TIMER_REG_PR:
+       return "Timer PR";
+	case LPC4088_TIMER_REG_PC:
+        return "Timer PC";
+	case LPC4088_TIMER_REG_MCR:
+        return "Timer MCR";
+    case LPC4088_TIMER_REG_MR0:
+        return "Timer MR0";
+	case LPC4088_TIMER_REG_MR1:
+       return "Timer MR1";
+	case LPC4088_TIMER_REG_MR2:
+        return "Timer MR2";
+	case LPC4088_TIMER_REG_MR3:
+        return "Timer MR3";
+	case LPC4088_TIMER_REG_CCR:
+        return "Timer CCR";
+	case LPC4088_TIMER_REG_CC0:
+       return "Timer CC0";
+	case LPC4088_TIMER_REG_CC1:
+        return "Timer CC1";
+	case LPC4088_TIMER_REG_EMR:
+        return "Timer EMR";
+	case LPC4088_TIMER_REG_CTCR:
+        return "Timer CTCR";
+    default:
+        return "Timer [?]";
     }
+}
 
 static void lpc4088_timer_set_alarm(LPC4088TimerState *s, int64_t now);
 
-static void lpc4088_timer_interrupt(void *opaque)
-{
+static void lpc4088_timer_interrupt(void *opaque) {
     LPC4088TimerState *s = opaque;
-
-    DB_PRINT("Interrupt\n");
 	
-	DPRINTF2("(%s, value = 0x%" PRIx32 ")\n","Interrupt", (uint32_t) s->timer_IR);
+	int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
 	
-	lpc4088_timer_set_alarm(s, s->hit_time);
+	if(((s->timer_MCR & (1 << 0)) != 0)) {
+		s->timer_IR |= 1 << 0;
+		
+		qemu_irq_pulse(s->irq);
+		//qemu_set_irq(s->irq,1);
+	}
+	if(((s->timer_MCR & (1 << 3)) != 0)) {
+		s->timer_IR |= 1 << 1;
+		
+		qemu_irq_pulse(s->irq);
+		//qemu_set_irq(s->irq,1);
+	}
+	if(((s->timer_MCR & (1 << 6)) != 0)) {
+		s->timer_IR |= 1 << 2;
+		
+		qemu_irq_pulse(s->irq);
+		//qemu_set_irq(s->irq,1);
+	}
+	if(((s->timer_MCR & (1 << 9)) != 0)) {
+		s->timer_IR |= 1 << 3;
+		
+		qemu_irq_pulse(s->irq);
+		//qemu_set_irq(s->irq,1);
+	}
+	
+	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","Timer Interrupt", (uint32_t) s->timer_IR);
+	
+	lpc4088_timer_set_alarm(s, now);
 }
 
-static inline int64_t lpc4088_ns_to_ticks(LPC4088TimerState *s, int64_t t)
-{
-    return muldiv64(t, s->freq_hz, 1000000000ULL) / (s->timer_PR + 1);
+static inline int64_t lpc4088_ns_to_ticks(LPC4088TimerState *s, int64_t t) {
+    return muldiv64(t, s->freq_hz, LPC4088_TIMER_FREQUENCY) / (s->timer_PR + 1);
 }
 
-static void lpc4088_timer_set_alarm(LPC4088TimerState *s, int64_t now)
-{
+static void lpc4088_timer_set_alarm(LPC4088TimerState *s, int64_t now) {
     uint64_t ticks;
     int64_t now_ticks;
-
-	now_ticks = lpc4088_ns_to_ticks(s, now);
-    ticks = 200000000 - (now_ticks - s->tick_offset);
+	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","Timer Set Alarm", (uint32_t) s->timer_MCR);
 	
-	s->hit_time = muldiv64((ticks + (uint64_t) now_ticks) * (s->timer_PR + 1),
-                               1000000000ULL, s->freq_hz);
-	
-	timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->hit_time);
-	
-    /*if (s->tim_arr == 0) {
-        return;
-    }
-
-    DB_PRINT("Alarm set at: 0x%x\n", s->tim_cr1);
-
-    now_ticks = stm32f2xx_ns_to_ticks(s, now);
-    ticks = s->tim_arr - (now_ticks - s->tick_offset);
-
-    DB_PRINT("Alarm set in %d ticks\n", (int) ticks);
-
-    s->hit_time = muldiv64((ticks + (uint64_t) now_ticks) * (s->tim_psc + 1),
-                               1000000000ULL, s->freq_hz);
-
-    timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->hit_time);
-    DB_PRINT("Wait Time: %" PRId64 " ticks\n", s->hit_time);*/
+	if(((s->timer_MCR & (1 << 0)) != 0)) {
+		now_ticks = lpc4088_ns_to_ticks(s, now);
+		ticks = s->timer_MR0 - (now_ticks - s->tick_offset);
+		
+		s->hit_time = muldiv64((ticks + (uint64_t) now_ticks) * (s->timer_PR + 1), LPC4088_TIMER_FREQUENCY, s->freq_hz);
+		
+		timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->hit_time);
+	}
+	if(((s->timer_MCR & (1 << 3)) != 0)) {
+		now_ticks = lpc4088_ns_to_ticks(s, now);
+		ticks = s->timer_MR1 - (now_ticks - s->tick_offset);
+		
+		s->hit_time = muldiv64((ticks + (uint64_t) now_ticks) * (s->timer_PR + 1), LPC4088_TIMER_FREQUENCY, s->freq_hz);
+		
+		timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->hit_time);
+	}
+	if(((s->timer_MCR & (1 << 6)) != 0)) {
+		now_ticks = lpc4088_ns_to_ticks(s, now);
+		ticks = s->timer_MR2 - (now_ticks - s->tick_offset);
+		
+		s->hit_time = muldiv64((ticks + (uint64_t) now_ticks) * (s->timer_PR + 1), LPC4088_TIMER_FREQUENCY, s->freq_hz);
+		
+		timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->hit_time);
+	}
+	if(((s->timer_MCR & (1 << 9)) != 0)) {
+		now_ticks = lpc4088_ns_to_ticks(s, now);
+		ticks = s->timer_MR3 - (now_ticks - s->tick_offset);
+		
+		s->hit_time = muldiv64((ticks + (uint64_t) now_ticks) * (s->timer_PR + 1), LPC4088_TIMER_FREQUENCY, s->freq_hz);
+		
+		timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->hit_time);
+	}
 }
 
-static void lpc4088_timer_reset(DeviceState *dev)
-{
+static void lpc4088_timer_reset(DeviceState *dev) {
     LPC4088TimerState *s = LPC4088TIMER(dev);
     int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
 
@@ -97,12 +152,10 @@ static void lpc4088_timer_reset(DeviceState *dev)
     s->tick_offset = lpc4088_ns_to_ticks(s, now);
 }
 
-static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset,
-                           unsigned size)
-{
+static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset, unsigned size) {
     LPC4088TimerState *s = opaque;
 
-    DB_PRINT("Read 0x%"HWADDR_PRIx"\n", offset);
+    int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
 
     switch (offset) {
     case LPC4088_TIMER_REG_IR:
@@ -110,6 +163,22 @@ static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset,
     case LPC4088_TIMER_REG_TCR:
         return s->timer_TCR;
     case LPC4088_TIMER_REG_TC:
+		if(s->timer_CTCR == 0) {
+			//Timer Reset
+			if(((s->timer_TCR & (1 << 1)) != 0)) {
+				s->timer_TC = 0;
+				s->tick_offset = lpc4088_ns_to_ticks(s, now);
+			}
+			//Timer Not Count
+			else if(((s->timer_TCR & (1 << 0)) == 0)) {
+			}
+			//Count Not Reset
+			else if(((s->timer_TCR & (1 << 1)) == 0) && (((s->timer_TCR & (1 << 0)) != 0))) {
+				s->timer_TC = s->timer_TC + lpc4088_ns_to_ticks(s, now) - s->tick_offset;
+				s->tick_offset = lpc4088_ns_to_ticks(s, now);
+			}
+		}		
+		DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_timer_register_name(offset), (uint32_t) s->timer_TC);
         return s->timer_TC;
 	case LPC4088_TIMER_REG_PR:
         return s->timer_PR;
@@ -136,38 +205,51 @@ static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset,
 	case LPC4088_TIMER_REG_CTCR:
         return s->timer_CTCR;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
+        qemu_log_mask(LOG_GUEST_ERROR,"%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
     }
 
     return 0;
 }
 
-static void lpc4088_timer_write(void *opaque, hwaddr offset,
-                        uint64_t val64, unsigned size)
-{
+static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, unsigned size) {
     LPC4088TimerState *s = opaque;
     uint32_t value = val64;
     int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
     uint32_t timer_val = 0;
-
-    DB_PRINT("Write 0x%x, 0x%"HWADDR_PRIx"\n", value, offset);
 	
-	DPRINTF2("(%s, value = 0x%" PRIx32 ")\n","Deneme",
-            (uint32_t) value);
+	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_timer_register_name(offset), (uint32_t) value);
 
     switch (offset) {
     case LPC4088_TIMER_REG_IR:
         s->timer_IR = value;
 		
-		timer_val = lpc4088_ns_to_ticks(s, now) - s->tick_offset;
-	
-		s->tick_offset = lpc4088_ns_to_ticks(s, now) - timer_val;
-		lpc4088_timer_set_alarm(s, now);
-	
+		if(((s->timer_MCR & (1 << 0)) != 0) && ((s->timer_IR & (1 << 0)) != 0)) {
+			s->timer_IR = s->timer_IR & ~(1 << 0);
+			qemu_set_irq(s->irq,0);
+		}
+		if(((s->timer_MCR & (1 << 3)) != 0) && ((s->timer_IR & (1 << 1)) != 0)) {
+			s->timer_IR = s->timer_IR & ~(1 << 1);
+			qemu_set_irq(s->irq,0);
+		}
+		if(((s->timer_MCR & (1 << 6)) != 0) && ((s->timer_IR & (1 << 2)) != 0)) {
+			s->timer_IR = s->timer_IR & ~(1 << 2);
+			qemu_set_irq(s->irq,0);
+		}
+		if(((s->timer_MCR & (1 << 9)) != 0) && ((s->timer_IR & (1 << 3)) != 0)) {
+			s->timer_IR = s->timer_IR & ~(1 << 3);
+			qemu_set_irq(s->irq,0);
+		}		
+		
         return;
     case LPC4088_TIMER_REG_TCR:
         s->timer_TCR = value;
+		if(s->timer_CTCR == 0) {
+			if(((s->timer_TCR & (1 << 1)) == 0) && (((s->timer_TCR & (1 << 0)) != 0))) {
+				timer_val = lpc4088_ns_to_ticks(s, now) - s->tick_offset;
+				s->tick_offset = lpc4088_ns_to_ticks(s, now) - timer_val;
+				lpc4088_timer_set_alarm(s, now);
+			}
+		}		
         return;
     case LPC4088_TIMER_REG_TC:
         s->timer_TC = value;
@@ -179,7 +261,7 @@ static void lpc4088_timer_write(void *opaque, hwaddr offset,
         s->timer_PC = value;
         return;
     case LPC4088_TIMER_REG_MCR:
-        s->timer_MCR = value;
+		s->timer_MCR = value;
         return;
 	case LPC4088_TIMER_REG_MR0:
         s->timer_MR0 = value;
@@ -209,12 +291,9 @@ static void lpc4088_timer_write(void *opaque, hwaddr offset,
         s->timer_CTCR = value;
         return;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
+        qemu_log_mask(LOG_GUEST_ERROR,"%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
         return;
     }
-	
-    
 }
 
 static const MemoryRegionOps lpc4088_timer_ops = {
@@ -249,31 +328,26 @@ static const VMStateDescription vmstate_lpc4088_timer = {
 };
 
 static Property lpc4088_timer_properties[] = {
-    DEFINE_PROP_UINT64("clock-frequency", struct LPC4088TimerState,
-                       freq_hz, 1000000000),
+    DEFINE_PROP_UINT64("clock-frequency", struct LPC4088TimerState, freq_hz, LPC4088_TIMER_FREQUENCY),
     DEFINE_PROP_END_OF_LIST(),
 };
 
-static void lpc4088_timer_init(Object *obj)
-{
+static void lpc4088_timer_init(Object *obj) {
     LPC4088TimerState *s = LPC4088TIMER(obj);
 
     sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
 
-    memory_region_init_io(&s->iomem, obj, &lpc4088_timer_ops, s,
-                          TYPE_LPC4088_TIMER, LPC4088_TIMER_MEM_SIZE);
+    memory_region_init_io(&s->iomem, obj, &lpc4088_timer_ops, s, TYPE_LPC4088_TIMER, LPC4088_TIMER_MEM_SIZE);
 						  
     sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->iomem);
 }
 
-static void lpc4088_timer_realize(DeviceState *dev, Error **errp)
-{
+static void lpc4088_timer_realize(DeviceState *dev, Error **errp) {
     LPC4088TimerState *s = LPC4088TIMER(dev);
     s->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, lpc4088_timer_interrupt, s);
 }
 
-static void lpc4088_timer_class_init(ObjectClass *klass, void *data)
-{
+static void lpc4088_timer_class_init(ObjectClass *klass, void *data) {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
     dc->reset = lpc4088_timer_reset;
@@ -290,8 +364,7 @@ static const TypeInfo lpc4088_timer_info = {
     .class_init    = lpc4088_timer_class_init,
 };
 
-static void lpc4088_timer_register_types(void)
-{
+static void lpc4088_timer_register_types(void) {
     type_register_static(&lpc4088_timer_info);
 }
 

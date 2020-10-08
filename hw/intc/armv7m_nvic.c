@@ -26,6 +26,12 @@
 #include "qemu/module.h"
 #include "trace.h"
 
+#ifndef ARMv7M_NVIC_ERROR_DEBUG
+#define ARMv7M_NVIC_ERROR_DEBUG 0
+#endif
+
+#define DEBUG_PRINT(fmt, args...) if(ARMv7M_NVIC_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_IRQ,__func__, ##args);}
+
 /* IRQ number counting:
  *
  * the num-irq property counts the number of external IRQ lines
@@ -49,7 +55,8 @@
  * (which are exception numbers NVIC_FIRST_IRQ and upward).
  * For historical reasons QEMU tends to use "interrupt" and
  * "exception" more or less interchangeably.
- */
+ */				
+				
 #define NVIC_FIRST_IRQ NVIC_INTERNAL_VECTORS
 #define NVIC_MAX_IRQ (NVIC_MAX_VECTORS - NVIC_FIRST_IRQ)
 
@@ -928,7 +935,7 @@ bool armv7m_nvic_get_ready_status(void *opaque, int irq, bool secure)
 
 /* callback when external interrupt line is changed */
 static void set_irq_level(void *opaque, int n, int level)
-{
+{	
     NVICState *s = opaque;
     VecInfo *vec;
 
@@ -946,7 +953,7 @@ static void set_irq_level(void *opaque, int n, int level)
      * level is low when the handler completes.
      */
     vec = &s->vectors[n];
-    if (level != vec->level) {
+    if (level != vec->level) {		
         vec->level = level;
         if (level) {
             armv7m_nvic_set_pending(s, n, false);
@@ -1469,8 +1476,8 @@ static uint32_t nvic_readl(NVICState *s, uint32_t offset, MemTxAttrs attrs)
 static void nvic_writel(NVICState *s, uint32_t offset, uint32_t value,
                         MemTxAttrs attrs)
 {
-    ARMCPU *cpu = s->cpu;
-
+    ARMCPU *cpu = s->cpu;				
+				
     switch (offset) {
     case 0xc: /* CPPWR */
         if (!arm_feature(&cpu->env, ARM_FEATURE_V8)) {
@@ -1518,6 +1525,7 @@ static void nvic_writel(NVICState *s, uint32_t offset, uint32_t value,
         break;
     case 0xd08: /* Vector Table Offset.  */
         cpu->env.v7m.vecbase[attrs.secure] = value & 0xffffff80;
+		
         break;
     case 0xd0c: /* Application Interrupt/Reset Control (AIRCR) */
         if ((value >> R_V7M_AIRCR_VECTKEY_SHIFT) == 0x05fa) {
@@ -2241,6 +2249,17 @@ static MemTxResult nvic_sysreg_write(void *opaque, hwaddr addr,
         offset += 0x80;
         setval = 1;
         /* fall through */
+		
+		startvec = 8 * (offset - 0x180) + NVIC_FIRST_IRQ;
+
+        for (i = 0, end = size * 8; i < end && startvec + i < s->num_irq; i++) {
+            if (value & (1 << i) &&
+                (attrs.secure || s->itns[startvec + i])) {
+                s->vectors[startvec + i].enabled = setval;
+            }
+        }
+        nvic_irq_update(s);
+        goto exit_ok;		
     case 0x180 ... 0x1bf: /* NVIC Clear enable */
         startvec = 8 * (offset - 0x180) + NVIC_FIRST_IRQ;
 
