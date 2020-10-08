@@ -17,7 +17,7 @@
 #include "trace.h"
 
 #ifndef DEBUG_LPC4088_GPIO
-#define DEBUG_LPC4088_GPIO 1
+#define DEBUG_LPC4088_GPIO 0
 #endif
 
 #define REMOTE_CTRL_GPIO_MAGIC 0xDEADBEE2

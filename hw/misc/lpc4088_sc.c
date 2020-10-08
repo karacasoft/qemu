@@ -9,7 +9,7 @@
 #include "hw/qdev-core.h"
 
 #ifndef LPC4088_SC_ERROR_DEBUG
-#define LPC4088_SC_ERROR_DEBUG 0
+#define LPC4088_SC_ERROR_DEBUG 1
 #endif
 
 #define DEBUG_PRINT(fmt, args...) if(LPC4088_SC_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_SC,__func__, ##args);}
@@ -66,6 +66,10 @@ static void lpc4088_sc_reset(DeviceState *dev) {
 
 	s->sc_EMCDLYCTL = 0x210;
 	s->sc_EMCCALd = 0x1F00;
+
+	if(s->hard_fault_irq) {
+		qemu_irq_lower(s->hard_fault_irq);
+	}
 }
 
 static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
@@ -82,7 +86,7 @@ static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
 		return s->sc_PLL0STAT;
 	case LPC4088_SC_REG_PLL0FEED:
 		// TODO hard fault??
-		qemu_set_irq(s->hard_fault_irq, 1);
+		qemu_irq_raise(s->hard_fault_irq);
 		return 0;
 	case LPC4088_SC_REG_PLL1CON:
 		return s->sc_PLL1CON;
@@ -328,8 +332,6 @@ static void lpc4088_sc_init(Object *obj) {
     sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
 	sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->hard_fault_irq);
 
-    memory_region_init_io(&s->mmio, obj, &lpc4088_sc_ops, s,TYPE_LPC4088_SC, LPC4088_SC_MEM_SIZE);
-    sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);
 }
 
 static Property lpc4088_sc_properties[] = {
@@ -339,7 +341,8 @@ static Property lpc4088_sc_properties[] = {
 static void lpc4088_sc_realize(DeviceState *dev, Error **errp)
 {
 	LPC4088SCState *s = LPC4088_SC(dev);
-	qdev_init_gpio_out_named(DEVICE(dev), &s->hard_fault_irq, "HardFaultIRQ", 1);
+	memory_region_init_io(&s->mmio, OBJECT(dev), &lpc4088_sc_ops, s,TYPE_LPC4088_SC, LPC4088_SC_MEM_SIZE);
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mmio);
 }
 
 static void lpc4088_sc_class_init(ObjectClass *klass, void *data) {

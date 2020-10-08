@@ -137,7 +137,7 @@ static void remote_ctrl_class_init(ObjectClass *klass, void *class_data)
             O_RDONLY | O_CREAT | __O_CLOEXEC,
             S_IRUSR | S_IWUSR, &remote_ctrl_mq_attr);
     mqd_t mqd_out = mq_open(REMOTE_CTRL_MQ_NAME_OUT,
-            O_WRONLY | O_CREAT | __O_CLOEXEC,
+            O_WRONLY | O_CREAT | __O_CLOEXEC | O_NONBLOCK,
             S_IRUSR | S_IWUSR, &remote_ctrl_mq_attr);
     if(mqd == -1 || mqd_out == -1) {
         DPRINTF("POSIX message queue cannot be opened\n");

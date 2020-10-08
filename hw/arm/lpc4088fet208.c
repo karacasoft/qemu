@@ -31,14 +31,16 @@ static const char *gpio_names[] = { "0", "1", "2", "3", "4", "5" };
 
 #define NAME_SIZE 20
 
+
 static void lpc4088fet208_trigger_hard_fault(void *opaque, int n, int level)
 {
     LPC4088FET208State *s = LPC4088FET208(opaque);
     if(level)
     {
-        cpu_interrupt(CPU(s->armv7m.cpu), CPU_INTERRUPT_HARD);
+        armv7m_nvic_set_pending((void *)&s->armv7m.nvic, ARMV7M_EXCP_HARD, false);
     }
 }
+
 
 static void lpc4088fet208_init(Object *obj)
 {
@@ -79,16 +81,13 @@ static void lpc4088fet208_init(Object *obj)
         object_initialize_child(obj, name, &s->usart[i],
                                 TYPE_LPC4088_USART);
     }
-
-    sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->hardfault_input_irq);
 }
 
 static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 {
     int i;
     LPC4088FET208State *s = LPC4088FET208(dev_soc);
-    DeviceState *dev, *armv7m;
-    SysBusDevice *busdev;
+    DeviceState *armv7m;
     Error *err = NULL;
 
     MemoryRegion *system_memory = get_system_memory();
@@ -129,36 +128,27 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
         return;
     }
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->syscon), 0, 0x400FC000);
-
-    qdev_connect_gpio_out_named(DEVICE(&s->syscon), "HardFaultIRQ", 1, s->hardfault_input_irq);
-    ///////////////////////// SYSCON /////////////////////////////
+    
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->syscon), 1,
+            qdev_get_gpio_in(dev_soc, 0));
+    ///////////////////////// SYSCON END /////////////////////////
 	
+    ///////////////////// USART //////////////////////////////////
 	for (i = 0; i < LPC4088_NR_USARTS; i++) {
-		dev = DEVICE(&(s->usart[i]));
+        DeviceState *dev = DEVICE(&(s->usart[i]));
+        SysBusDevice *busdev = SYS_BUS_DEVICE(&s->usart[i]);
         qdev_prop_set_chr(dev, "chardev", serial_hd(i));
-        sysbus_realize(SYS_BUS_DEVICE(&s->usart[i]), &err);
+        sysbus_realize(busdev, &err);
         if (err != NULL) {
             error_propagate(errp, err);
             return;
         }
-        busdev = SYS_BUS_DEVICE(dev);
         sysbus_mmio_map(busdev, 0, usart_addresses[i]);
         sysbus_connect_irq(busdev, 0, qdev_get_gpio_in(armv7m, usart_irq[i]));
-		
-		
-		/*qdev_prop_set_chr(SYS_BUS_DEVICE(&s->usart[i]), "chardev", serial_hd(i));
-        sysbus_realize(SYS_BUS_DEVICE(&s->usart[i]), &err);
-		
-        if (err) {
-            error_propagate(errp, err);
-            return;
-        }
-		
-		sysbus_mmio_map(SYS_BUS_DEVICE(&s->usart[i]), 0, usart_addresses[i]);
-		
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->usart[i]), 0, qdev_get_gpio_in(SYS_BUS_DEVICE(&s->armv7m), usart_irq[i]));*/
     }
+    ///////////////////////// USART END //////////////////////////
 	
+    ///////////////////////// GPIO ///////////////////////////////
     for (i = 0; i < LPC4088_NR_GPIO_PORTS; i++)
     {
         qdev_prop_set_string(DEVICE(&s->gpio[i]), "port-name", gpio_names[i]);
@@ -174,80 +164,55 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->gpio[i]), 0,
                 LPC4088_GPIO_BASE_ADDR + 0x20 * i);
     }
-	
+    ///////////////////////// GPIO END ///////////////////////////
+
+    ///////////////////////// TIMER //////////////////////////////
 	for (i = 0; i < LPC4088_NR_TIMERS; i++) {
-		dev = DEVICE(&(s->timer[i]));
+        DeviceState *dev = DEVICE(&(s->timer[i]));
+        SysBusDevice *busdev = SYS_BUS_DEVICE(&(s->timer[i]));
+
         qdev_prop_set_uint64(dev, "clock-frequency", 60000000);
-        sysbus_realize(SYS_BUS_DEVICE(&s->timer[i]), &err);
+        sysbus_realize(busdev, &err);
         if (err != NULL) {
             error_propagate(errp, err);
             return;
         }
-        busdev = SYS_BUS_DEVICE(dev);
         sysbus_mmio_map(busdev, 0, timer_addresses[i]);
         sysbus_connect_irq(busdev, 0, qdev_get_gpio_in(armv7m, timer_irq[i]));
-		
-		/*dev = DEVICE(&(s->usart[i]));
-        qdev_prop_set_uint64(SYS_BUS_DEVICE(&s->timer[i]), "clock-frequency", 1000000000);
-        sysbus_realize(SYS_BUS_DEVICE(&s->timer[i]), &err);
-		
-        if (err) {
-            error_propagate(errp, err);
-            return;
-        }
-		
-		sysbus_mmio_map(SYS_BUS_DEVICE(&s->timer[i]), 0, timer_addresses[i]);
-		
-        sysbus_connect_irq(SYS_BUS_DEVICE(DEVICE(&s->timer[i])), 0, qdev_get_gpio_in(DEVICE(&s->armv7m), timer_irq[i]));*/
     }
-	
+    ///////////////////////// TIMER END //////////////////////////
+
+    ///////////////////////// PWM ////////////////////////////////
 	for (i = 0; i < LPC4088_NR_PWMS; i++) {
-		dev = DEVICE(&(s->pwm[i]));
+        DeviceState *dev = DEVICE(&(s->pwm[i]));
+        SysBusDevice *busdev = SYS_BUS_DEVICE(dev);
+
         qdev_prop_set_uint64(dev, "clock-frequency", 1000000000);
-        sysbus_realize(SYS_BUS_DEVICE(&s->pwm[i]), &err);
+        sysbus_realize(busdev, &err);
         if (err != NULL) {
             error_propagate(errp, err);
             return;
         }
-        busdev = SYS_BUS_DEVICE(dev);
         sysbus_mmio_map(busdev, 0, pwm_addresses[i]);
         sysbus_connect_irq(busdev, 0, qdev_get_gpio_in(armv7m, pwm_irq[i]));
-		
-        /*qdev_prop_set_uint64(SYS_BUS_DEVICE(&s->pwm[i]), "clock-frequency", 1000000000);
-        sysbus_realize(SYS_BUS_DEVICE(&s->pwm[i]), &err);
-		
-        if (err) {
-            error_propagate(errp, err);
-            return;
-        }
-		
-		sysbus_mmio_map(SYS_BUS_DEVICE(&s->pwm[i]), 0, pwm_addresses[i]);
-		
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->pwm[i]), 0, qdev_get_gpio_in(SYS_BUS_DEVICE(&s->armv7m), pwm_irq[i]));*/
+
     }
+    ///////////////////////// PWM END ////////////////////////////
 	
+    ///////////////////////// ADC ////////////////////////////////
 	for (i = 0; i < LPC4088_NR_ADCS; i++) {
-        sysbus_realize(SYS_BUS_DEVICE(&s->adc[i]), &err);
+        SysBusDevice *busdev = SYS_BUS_DEVICE(&s->adc[i]);
+        sysbus_realize(busdev, &err);
         if (err != NULL) {
             error_propagate(errp, err);
             return;
         }
-        busdev = SYS_BUS_DEVICE(dev);
         sysbus_mmio_map(busdev, 0, adc_addresses[i]);
         sysbus_connect_irq(busdev, 0, qdev_get_gpio_in(armv7m, adc_irq[i]));
-		
-        /*sysbus_realize(SYS_BUS_DEVICE(&s->adc[i]), &err);
-		
-        if (err) {
-            error_propagate(errp, err);
-            return;
-        }
-		
-		sysbus_mmio_map(SYS_BUS_DEVICE(&s->adc[i]), 0, adc_addresses[i]);
-		
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->adc[i]), 0, qdev_get_gpio_in(SYS_BUS_DEVICE(&s->armv7m), adc_irq[i]));*/
+
     }
-	
+	///////////////////////// ADC END ////////////////////////////
+
     if(err != NULL)
     {
         error_propagate(errp, err);
