@@ -3,10 +3,13 @@
 
 #include "hw/sysbus.h"
 #include "qemu/timer.h"
+#include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_PWM "lpc4088-pwm"
 
 #define LPC4088PWM(obj) OBJECT_CHECK(LPC4088PWMState, (obj), TYPE_LPC4088_PWM)
+
+#define LPC4088_PWM_TIMER_FREQUENCY 0x3938700
 
 #define LPC4088_PWM_MEM_SIZE 0x080
 
@@ -41,6 +44,10 @@ typedef struct LPC4088PWMState {
     MemoryRegion iomem;
     QEMUTimer *timer;
     qemu_irq irq;
+	
+	char *pwm_name;
+    bool enable_rc;
+	uint32_t enableRemoteInterrupt;
 
     int64_t tick_offset;
     uint64_t hit_time;
@@ -67,6 +74,8 @@ typedef struct LPC4088PWMState {
 	uint32_t pwm_PCR;
 	uint32_t pwm_LER;
 	uint32_t pwm_CTCR;
+	
+	RemoteCtrlState rcs;
 	
 } LPC4088PWMState;
 

@@ -3,6 +3,7 @@
 
 #include "hw/sysbus.h"
 #include "qemu/timer.h"
+#include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_TIMER "lpc4088-timer"
 
@@ -37,6 +38,10 @@ typedef struct LPC4088TimerState {
     MemoryRegion iomem;
     QEMUTimer *timer;
     qemu_irq irq;
+	
+	char *timer_name;
+    bool enable_rc;
+	uint32_t enableRemoteInterrupt;
 
     int64_t tick_offset;
     uint64_t hit_time;
@@ -57,6 +62,8 @@ typedef struct LPC4088TimerState {
 	uint32_t timer_CC1;
 	uint32_t timer_EMR;
 	uint32_t timer_CTCR;
+	
+	RemoteCtrlState rcs;
 	
 } LPC4088TimerState;
 

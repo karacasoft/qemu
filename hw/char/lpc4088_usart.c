@@ -1,30 +1,56 @@
 #include "qemu/osdep.h"
-#include "hw/char/lpc4088_usart.h"
 #include "hw/irq.h"
 #include "hw/qdev-properties.h"
+#include "hw/char/lpc4088_usart.h"
+#include "migration/vmstate.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
+#include "qapi/error.h"
 
-#ifndef LPC4088_USART_ERR_DEBUG
-#define LPC4088_USART_ERR_DEBUG 1
+#ifndef LPC4088_USART_ERROR_DEBUG
+#define LPC4088_USART_ERROR_DEBUG 1
 #endif
 
-#define DB_PRINT_L(lvl, fmt, args...) do { \
-    if (LPC4088_USART_ERR_DEBUG >= lvl) { \
-        qemu_log("%s: " fmt, __func__, ## args); \
-    } \
-} while (0)
+#define DEBUG_PRINT(fmt, args...) if(LPC4088_USART_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_USART,__func__, ##args);}
 
-#define DB_PRINT(fmt, args...) DB_PRINT_L(1, fmt, ## args)
+#define REMOTE_CTRL_USART_MAGIC 0xDEEDBEE5
 
-#define DPRINTF2(fmt, args...) \
-    if(LPC4088_USART_ERR_DEBUG) { \
-        fprintf(stderr, "[%s]%s: " fmt, TYPE_LPC4088_USART, \
-                __func__, ##args); \
+static const char *lpc4088_usart_register_name(uint32_t offset) {
+	switch (offset) {
+    case LPC4088_USART_REG_RBR:
+        return "USART_RBR_THR_DLL";
+		
+    case LPC4088_USART_REG_DLM:
+        return "USART_DLM_IER";
+		
+    case LPC4088_USART_REG_IIR:
+        return "USART_IIR_FCR";
+		
+	case LPC4088_USART_REG_LCR:
+        return "USART_LCR";
+	case LPC4088_USART_REG_LSR:
+        return "USART_LSR";
+	case LPC4088_USART_REG_SCR:
+        return "USART_SCR";
+	case LPC4088_USART_REG_ACR:
+        return "USART_ACR";
+	case LPC4088_USART_REG_FDR:
+        return "USART_FDR";
+	case LPC4088_USART_REG_TER:
+        return "USART_TER";
+		
+	case LPC4088_USART_REG_RS485CTRL:
+        return "USART_RS485CTRL";
+	case LPC4088_USART_REG_RS485ADRMATCH:
+        return "USART_RS485ADRMATCH";
+	case LPC4088_USART_REG_RS485DLY:
+        return "USART_RS485DLY";
+    default:
+        return "USART_[?]";
     }
-	
-static int lpc4088_usart_can_receive(void *opaque)
-{
+}
+
+static int lpc4088_usart_can_receive(void *opaque) {
     LPC4088USARTState *s = opaque;
 
     if (!(s->usart_RBR)) {
@@ -34,25 +60,19 @@ static int lpc4088_usart_can_receive(void *opaque)
     return 0;
 }
 
-static void lpc4088_usart_receive(void *opaque, const uint8_t *buf, int size)
-{
+static void lpc4088_usart_receive(void *opaque, const uint8_t *buf, int size) {
     LPC4088USARTState *s = opaque;
 
     s->usart_RBR = *buf;
 
     qemu_set_irq(s->irq, 1);
 
-    DB_PRINT("Receiving: %c\n", s->usart_RBR);
-	
-	DPRINTF2("(%s, value = 0x%" PRIx32 ")\n","Deneme Uart",
-            (uint32_t) s->usart_RBR);
+	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","Receiving", (uint32_t) s->usart_RBR);
 }
 
-static void lpc4088_usart_reset(DeviceState *dev)
-{
+static void lpc4088_usart_reset(DeviceState *dev) {
     LPC4088USARTState *s = LPC4088USART(dev);
-
-
+	
 	s->usart_RBR = 0x00000000;
 	s->usart_THR = 0x00000000;
 	s->usart_DLL = 0x00000000;
@@ -72,22 +92,17 @@ static void lpc4088_usart_reset(DeviceState *dev)
 	s->usart_RS485CTRL = 0x00000000;
 	s->usart_RS485ADRMATCH = 0x00000000;
 	s->usart_RS485DLY = 0x00000000;
+	
+	s->enableRemoteInterrupt = 0;
 
     qemu_set_irq(s->irq, 0);
 }
 
-static uint64_t lpc4088_usart_read(void *opaque, hwaddr addr,
-                                       unsigned int size)
-{
+static uint64_t lpc4088_usart_read(void *opaque, hwaddr offset, unsigned int size) {
     LPC4088USARTState *s = opaque;
     uint64_t retvalue;
 
-    DB_PRINT("Read 0x%"HWADDR_PRIx"\n", addr);
-	
-	DPRINTF2("(%s, value = 0x%" PRIx32 ")\n","Deneme Uart",
-            (uint32_t) s->usart_RBR);
-
-    switch (addr) {
+    switch (offset) {
 	case LPC4088_USART_REG_RBR:
         retvalue = s->usart_RBR;
         qemu_chr_fe_accept_input(&s->chr);
@@ -130,27 +145,20 @@ static uint64_t lpc4088_usart_read(void *opaque, hwaddr addr,
 	case LPC4088_USART_REG_RS485DLY:
         return s->usart_RS485DLY;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, addr);
-        return 0;
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
     }
 
     return 0;
 }
 
-static void lpc4088_usart_write(void *opaque, hwaddr addr,
-                                  uint64_t val64, unsigned int size)
-{
+static void lpc4088_usart_write(void *opaque, hwaddr offset, uint64_t val64, unsigned int size) {
     LPC4088USARTState *s = opaque;
     uint32_t value = val64;
     unsigned char ch;
 
-    DB_PRINT("Write Us 0x%" PRIx32 ", 0x%"HWADDR_PRIx"\n", value, addr);
+	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_usart_register_name(offset), (uint32_t) offset);
 	
-	DPRINTF2("(%s, value = 0x%" PRIx32 ")\n","Deneme Uart",
-            (uint32_t) value);
-
-    switch (addr) {
+    switch (offset) {
     case LPC4088_USART_REG_RBR:
 		ch = value;
 		qemu_chr_fe_write_all(&s->chr, &ch, 1);
@@ -207,8 +215,16 @@ static void lpc4088_usart_write(void *opaque, hwaddr addr,
         s->usart_RS485DLY = value;
         return;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, addr);
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
+    }
+}
+
+static void lpc4088_usart_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlMessage *msg) {
+    LPC4088USARTState *s = LPC4088USART(rcs->connected_device);
+    
+	if(s->enable_rc) {
+		if(msg->arg1 == s->usart_name[0] && msg->arg2 < 32) {
+		}
     }
 }
 
@@ -218,37 +234,74 @@ static const MemoryRegionOps lpc4088_usart_ops = {
     .endianness = DEVICE_NATIVE_ENDIAN,
 };
 
+static const VMStateDescription vmstate_lpc4088_usart = {
+    .name = TYPE_LPC4088_USART,
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (VMStateField[]) {
+        VMSTATE_UINT32(usart_RBR, LPC4088USARTState),
+        VMSTATE_UINT32(usart_DLM, LPC4088USARTState),
+        VMSTATE_UINT32(usart_IIR, LPC4088USARTState),
+        VMSTATE_UINT32(usart_LCR, LPC4088USARTState),
+        VMSTATE_UINT32(usart_LSR, LPC4088USARTState),
+		VMSTATE_UINT32(usart_SCR, LPC4088USARTState),
+		VMSTATE_UINT32(usart_ACR, LPC4088USARTState),
+		VMSTATE_UINT32(usart_FDR, LPC4088USARTState),
+		VMSTATE_UINT32(usart_TER, LPC4088USARTState),
+		VMSTATE_UINT32(usart_RS485CTRL, LPC4088USARTState),
+		VMSTATE_UINT32(usart_RS485ADRMATCH, LPC4088USARTState),
+		VMSTATE_UINT32(usart_RS485DLY, LPC4088USARTState),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
 static Property lpc4088_usart_properties[] = {
     DEFINE_PROP_CHR("chardev", LPC4088USARTState, chr),
+	DEFINE_PROP_STRING("usart-name", struct LPC4088USARTState, usart_name),
+    DEFINE_PROP_BOOL("enable-rc", struct LPC4088USARTState, enable_rc, false),
     DEFINE_PROP_END_OF_LIST(),
 };
 
-static void lpc4088_usart_init(Object *obj)
-{			
+static void lpc4088_usart_init(Object *obj) {
     LPC4088USARTState *s = LPC4088USART(obj);
+	
+	DeviceState *ds = DEVICE(obj);
+	
+	object_initialize_child_with_props(
+        obj, "RemoteCtrl", &s->rcs,
+        sizeof(RemoteCtrlState), TYPE_REMOTE_CTRL, &error_abort,
+        NULL
+    );
+	
+	s->rcs.connected_device = ds;
 
-    sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
+    /*sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
 
     memory_region_init_io(&s->mmio, obj, &lpc4088_usart_ops, s,
                           TYPE_LPC4088_USART, LPC4088_USART_MEM_SIZE);
-    sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);
+    sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);*/
 }
 
-static void lpc4088_usart_realize(DeviceState *dev, Error **errp)
-{
+static void lpc4088_usart_realize(DeviceState *dev, Error **errp) {
     LPC4088USARTState *s = LPC4088USART(dev);
+	
+	sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq);
 
-    qemu_chr_fe_set_handlers(&s->chr, lpc4088_usart_can_receive,
-                             lpc4088_usart_receive, NULL, NULL,
-                             s, NULL, true);
+    memory_region_init_io(&s->iomem, OBJECT(s), &lpc4088_usart_ops, s, TYPE_LPC4088_USART, LPC4088_USART_MEM_SIZE);
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
+
+    qemu_chr_fe_set_handlers(&s->chr, lpc4088_usart_can_receive, lpc4088_usart_receive, NULL, NULL, s, NULL, true);
+	
+	s->rcs.callback = lpc4088_usart_remote_ctrl_callback;
+    qdev_realize(DEVICE(&s->rcs), qdev_get_parent_bus(DEVICE(&s->rcs)), errp);
 }
 
-static void lpc4088_usart_class_init(ObjectClass *klass, void *data)
-{
+static void lpc4088_usart_class_init(ObjectClass *klass, void *data) {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
     dc->reset = lpc4088_usart_reset;
     device_class_set_props(dc, lpc4088_usart_properties);
+	dc->vmsd = &vmstate_lpc4088_usart;
     dc->realize = lpc4088_usart_realize;
 }
 
@@ -260,8 +313,7 @@ static const TypeInfo lpc4088_usart_info = {
     .class_init    = lpc4088_usart_class_init,
 };
 
-static void lpc4088_usart_register_types(void)
-{
+static void lpc4088_usart_register_types(void) {
     type_register_static(&lpc4088_usart_info);
 }
 

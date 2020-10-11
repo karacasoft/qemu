@@ -5,76 +5,87 @@
 #include "migration/vmstate.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
+#include "qapi/error.h"
 
 #ifndef LPC4088_PWM_ERR_DEBUG
 #define LPC4088_PWM_ERR_DEBUG 1
 #endif
 
-#define DB_PRINT_L(lvl, fmt, args...) do { \
-    if (LPC4088_PWM_ERR_DEBUG >= lvl) { \
-        qemu_log("%s: " fmt, __func__, ## args); \
-    } \
-} while (0)
+#define DEBUG_PRINT(fmt, args...) if(LPC4088_PWM_ERR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_PWM,__func__, ##args);}
 
-#define DB_PRINT(fmt, args...) DB_PRINT_L(1, fmt, ## args)
+#define REMOTE_CTRL_PWM_MAGIC 0xDEEDBEE4
 
-#define DPRINTF2(fmt, args...) \
-    if(LPC4088_PWM_ERR_DEBUG) { \
-        fprintf(stderr, "[%s]%s: " fmt, TYPE_LPC4088_PWM, \
-                __func__, ##args); \
+static const char *lpc4088_pwm_register_name(uint32_t offset) {
+	switch (offset) {
+    case LPC4088_PWM_REG_IR:
+        return "PWM_IR";
+    case LPC4088_PWM_REG_TCR:
+        return "PWM_TCR";
+    case LPC4088_PWM_REG_TC:
+        return "PWM_TC";
+	case LPC4088_PWM_REG_PR:
+        return "PWM_PR";
+	case LPC4088_PWM_REG_PC:
+        return "PWM_PC";
+	case LPC4088_PWM_REG_MCR:
+        return "PWM_MCR";
+    case LPC4088_PWM_REG_MR0:
+        return "PWM_MR0";
+	case LPC4088_PWM_REG_MR1:
+        return "PWM_MR1";
+	case LPC4088_PWM_REG_MR2:
+        return "PWM_MR2";
+	case LPC4088_PWM_REG_MR3:
+        return "PWM_MR3";
+	case LPC4088_PWM_REG_CCR:
+        return "PWM_CCR";
+	case LPC4088_PWM_REG_CC0:
+        return "PWM_CC0";
+	case LPC4088_PWM_REG_CC1:
+        return "PWM_CC1";
+	case LPC4088_PWM_REG_CC2:
+        return "PWM_CC2";
+	case LPC4088_PWM_REG_CC3:
+        return "PWM_CC3";
+	case LPC4088_PWM_REG_MR4:
+        return "PWM_MR4";
+	case LPC4088_PWM_REG_MR5:
+        return "PWM_MR5";
+	case LPC4088_PWM_REG_MR6:
+        return "PWM_MR6";
+	case LPC4088_PWM_REG_PCR:
+        return "PWM_PCR";
+	case LPC4088_PWM_REG_LER:
+        return "PWM_LER";
+	case LPC4088_PWM_REG_CTCR:
+        return "PWM_CTCR";
+    default:
+        return "PWM_[?]";
     }
+}
 
 static void lpc4088_pwm_set_alarm(LPC4088PWMState *s, int64_t now);
 
-static void lpc4088_pwm_interrupt(void *opaque)
-{
+static void lpc4088_pwm_interrupt(void *opaque) {
     LPC4088PWMState *s = opaque;
-
-    DB_PRINT("Interrupt\n");
 	
-	DPRINTF2("(%s, value = 0x%" PRIx32 ")\n","Interrupt", (uint32_t) s->pwm_IR);
+	int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+	
+	if(s->pwm_IR != 0) {
+		DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","PWM_Interrupt", (uint32_t) s->pwm_IR);
+	}
 	
 	lpc4088_pwm_set_alarm(s, s->hit_time);
 }
 
-static inline int64_t lpc4088_pwm_ns_to_ticks(LPC4088PWMState *s, int64_t t)
-{
+static inline int64_t lpc4088_pwm_ns_to_ticks(LPC4088PWMState *s, int64_t t) {
     return muldiv64(t, s->freq_hz, 1000000000ULL) / (s->pwm_PR + 1);
 }
 
-static void lpc4088_pwm_set_alarm(LPC4088PWMState *s, int64_t now)
-{
-    uint64_t ticks;
-    int64_t now_ticks;
-
-	now_ticks = lpc4088_pwm_ns_to_ticks(s, now);
-    ticks = 200000000 - (now_ticks - s->tick_offset);
-	
-	s->hit_time = muldiv64((ticks + (uint64_t) now_ticks) * (s->pwm_PR + 1),
-                               1000000000ULL, s->freq_hz);
-	
-	timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->hit_time);
-	
-    /*if (s->tim_arr == 0) {
-        return;
-    }
-
-    DB_PRINT("Alarm set at: 0x%x\n", s->tim_cr1);
-
-    now_ticks = stm32f2xx_ns_to_ticks(s, now);
-    ticks = s->tim_arr - (now_ticks - s->tick_offset);
-
-    DB_PRINT("Alarm set in %d ticks\n", (int) ticks);
-
-    s->hit_time = muldiv64((ticks + (uint64_t) now_ticks) * (s->tim_psc + 1),
-                               1000000000ULL, s->freq_hz);
-
-    timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + s->hit_time);
-    DB_PRINT("Wait Time: %" PRId64 " ticks\n", s->hit_time);*/
+static void lpc4088_pwm_set_alarm(LPC4088PWMState *s, int64_t now) {
 }
 
-static void lpc4088_pwm_reset(DeviceState *dev)
-{
+static void lpc4088_pwm_reset(DeviceState *dev) {
     LPC4088PWMState *s = LPC4088PWM(dev);
     int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
 
@@ -99,16 +110,16 @@ static void lpc4088_pwm_reset(DeviceState *dev)
 	s->pwm_PCR = 0;
 	s->pwm_LER = 0;
 	s->pwm_CTCR = 0;
+	
+	s->enableRemoteInterrupt = 0;
 
     s->tick_offset = lpc4088_pwm_ns_to_ticks(s, now);
 }
 
-static uint64_t lpc4088_pwm_read(void *opaque, hwaddr offset,
-                           unsigned size)
-{
+static uint64_t lpc4088_pwm_read(void *opaque, hwaddr offset, unsigned size) {
     LPC4088PWMState *s = opaque;
-
-    DB_PRINT("Read 0x%"HWADDR_PRIx"\n", offset);
+	
+	int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
 
     switch (offset) {
     case LPC4088_PWM_REG_IR:
@@ -154,35 +165,23 @@ static uint64_t lpc4088_pwm_read(void *opaque, hwaddr offset,
 	case LPC4088_PWM_REG_CTCR:
         return s->pwm_CTCR;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
     }
 
     return 0;
 }
 
-static void lpc4088_pwm_write(void *opaque, hwaddr offset,
-                        uint64_t val64, unsigned size)
-{
+static void lpc4088_pwm_write(void *opaque, hwaddr offset, uint64_t val64, unsigned size) {
     LPC4088PWMState *s = opaque;
     uint32_t value = val64;
     int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
     uint32_t timer_val = 0;
 
-    DB_PRINT("Write 0x%x, 0x%"HWADDR_PRIx"\n", value, offset);
-	
-	DPRINTF2("(%s, value = 0x%" PRIx32 ")\n","Deneme",
-            (uint32_t) value);
+    DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_pwm_register_name(offset), (uint32_t) value);
 
     switch (offset) {
     case LPC4088_PWM_REG_IR:
-        s->pwm_IR = value;
-		
-		timer_val = lpc4088_pwm_ns_to_ticks(s, now) - s->tick_offset;
-	
-		s->tick_offset = lpc4088_pwm_ns_to_ticks(s, now) - timer_val;
-		lpc4088_pwm_set_alarm(s, now);
-	
+        s->pwm_IR = value;	
         return;
     case LPC4088_PWM_REG_TCR:
         s->pwm_TCR = value;
@@ -245,12 +244,20 @@ static void lpc4088_pwm_write(void *opaque, hwaddr offset,
         s->pwm_CTCR = value;
         return;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
         return;
     }
+}
+
+static void lpc4088_pwm_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlMessage *msg) {
+    LPC4088PWMState *s = LPC4088PWM(rcs->connected_device);
 	
+	int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
     
+	if(s->enable_rc) {
+		if(msg->arg1 == s->pwm_name[0] && msg->arg2 < 32) {
+		}
+    }
 }
 
 static const MemoryRegionOps lpc4088_pwm_ops = {
@@ -291,31 +298,49 @@ static const VMStateDescription vmstate_lpc4088_pwm = {
 };
 
 static Property lpc4088_pwm_properties[] = {
-    DEFINE_PROP_UINT64("clock-frequency", struct LPC4088PWMState,
-                       freq_hz, 1000000000),
+    DEFINE_PROP_UINT64("clock-frequency", struct LPC4088PWMState, freq_hz, LPC4088_PWM_TIMER_FREQUENCY),
+	DEFINE_PROP_STRING("pwm-name", struct LPC4088PWMState, pwm_name),
+    DEFINE_PROP_BOOL("enable-rc", struct LPC4088PWMState, enable_rc, false),
     DEFINE_PROP_END_OF_LIST(),
 };
 
-static void lpc4088_pwm_init(Object *obj)
-{
+static void lpc4088_pwm_init(Object *obj) {
     LPC4088PWMState *s = LPC4088PWM(obj);
+	
+	DeviceState *ds = DEVICE(obj);
+	
+	object_initialize_child_with_props(
+        obj, "RemoteCtrl", &s->rcs,
+        sizeof(RemoteCtrlState), TYPE_REMOTE_CTRL, &error_abort,
+        NULL
+    );
 
-    sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
+    s->rcs.connected_device = ds;
+
+    /*sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
 
     memory_region_init_io(&s->iomem, obj, &lpc4088_pwm_ops, s,
                           TYPE_LPC4088_PWM, LPC4088_PWM_MEM_SIZE);
 						  
-    sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->iomem);
+    sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->iomem);*/
 }
 
-static void lpc4088_pwm_realize(DeviceState *dev, Error **errp)
-{
+static void lpc4088_pwm_realize(DeviceState *dev, Error **errp) {
     LPC4088PWMState *s = LPC4088PWM(dev);
+	
+	sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq);
+	
+	memory_region_init_io(&s->iomem, OBJECT(s), &lpc4088_pwm_ops, s, TYPE_LPC4088_PWM, LPC4088_PWM_MEM_SIZE);
+
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);	
+	
     s->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, lpc4088_pwm_interrupt, s);
+
+    s->rcs.callback = lpc4088_pwm_remote_ctrl_callback;
+    qdev_realize(DEVICE(&s->rcs), qdev_get_parent_bus(DEVICE(&s->rcs)), errp);
 }
 
-static void lpc4088_pwm_class_init(ObjectClass *klass, void *data)
-{
+static void lpc4088_pwm_class_init(ObjectClass *klass, void *data) {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
     dc->reset = lpc4088_pwm_reset;
@@ -332,8 +357,7 @@ static const TypeInfo lpc4088_pwm_info = {
     .class_init    = lpc4088_pwm_class_init,
 };
 
-static void lpc4088_pwm_register_types(void)
-{
+static void lpc4088_pwm_register_types(void) {
     type_register_static(&lpc4088_pwm_info);
 }
 
