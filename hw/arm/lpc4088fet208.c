@@ -153,6 +153,9 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
     {
         qdev_prop_set_string(DEVICE(&s->gpio[i]), "port-name", gpio_names[i]);
         qdev_prop_set_bit(DEVICE(&s->gpio[i]), "enable-rc", true);
+        object_property_set_link(OBJECT(&s->gpio[i]),
+                OBJECT(&s->syscon), "syscon",
+                &err);
         sysbus_realize(SYS_BUS_DEVICE(&s->gpio[i]), &err);
         
         if (err)

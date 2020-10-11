@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include "hw/sysbus.h"
 #include "hw/remotectrl/remotectrl.h"
+#include "hw/misc/lpc4088_sc.h"
 
 #define LPC4088_GPIO_PORT_MEM_SIZE 0x20
 
@@ -41,6 +42,8 @@ typedef struct __LPC4088GPIOPortState {
     uint32_t pin;
 
     qemu_irq output[LPC4088_GPIO_PORT_PIN_COUNT];
+
+    LPC4088SCState *sc;
 
     RemoteCtrlState rcs;
 

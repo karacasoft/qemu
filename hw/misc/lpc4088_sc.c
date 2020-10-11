@@ -84,19 +84,12 @@ static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
 		return s->sc_PLL0CFG;
 	case LPC4088_SC_REG_PLL0STAT:
 		return s->sc_PLL0STAT;
-	case LPC4088_SC_REG_PLL0FEED:
-		// TODO hard fault??
-		qemu_irq_raise(s->hard_fault_irq);
-		return 0;
 	case LPC4088_SC_REG_PLL1CON:
 		return s->sc_PLL1CON;
 	case LPC4088_SC_REG_PLL1CFG:
 		return s->sc_PLL1CFG;
 	case LPC4088_SC_REG_PLL1STAT:
 		return s->sc_PLL1STAT;
-	case LPC4088_SC_REG_PLL1FEED:
-		// TODO hard fault??
-		return 0;
 	case LPC4088_SC_REG_PCON:
 		return s->sc_PCON;
 	case LPC4088_SC_REG_PCONP:
@@ -149,6 +142,10 @@ static uint64_t lpc4088_sc_read(void *opaque, hwaddr addr, unsigned int size) {
 		return s->sc_EMCDLYCTL;
 	case LPC4088_SC_REG_EMCCALd:
 		return s->sc_EMCCALd;
+	case LPC4088_SC_REG_PLL0FEED:
+	case LPC4088_SC_REG_PLL1FEED:
+		qemu_irq_pulse(s->hard_fault_irq);
+		return 0;
     default:
         qemu_log_mask(LOG_GUEST_ERROR,"%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, addr);
     }

@@ -17,7 +17,7 @@
 #include "trace.h"
 
 #ifndef DEBUG_LPC4088_GPIO
-#define DEBUG_LPC4088_GPIO 0
+#define DEBUG_LPC4088_GPIO 1
 #endif
 
 #define REMOTE_CTRL_GPIO_MAGIC 0xDEADBEE2
@@ -141,6 +141,8 @@ static void lpc4088_gpio_write(void *opaque, hwaddr offset, uint64_t value,
 
     DPRINTF("(%s, value = 0x%" PRIx32 ")\n", lpc4088_gpio_reg_name(offset),
             (uint32_t) value);
+
+    
     
     trace_lpc4088_gpio_write(offset, value);
 
@@ -173,11 +175,26 @@ static void lpc4088_gpio_write(void *opaque, hwaddr offset, uint64_t value,
     return;
 }
 
+static bool lpc4088_gpio_memory_op_accepts(
+            void *opaque, hwaddr addr,
+            unsigned size, bool is_write,
+            MemTxAttrs attrs) {
+    LPC4088GPIOPortState *s = LPC4088_GPIO_PORT(opaque);
+
+    if(!(s->sc->sc_PCONP & LPC4088_PCONP_GPIO_MASK)) {
+        qemu_irq_pulse(s->sc->hard_fault_irq);
+        DPRINTF("wowow\n");
+        return false;
+    }
+    return true;
+}
+
 static const MemoryRegionOps lpc4088_gpio_ops = {
     .read = lpc4088_gpio_read,
     .write = lpc4088_gpio_write,
     .valid.min_access_size = 4,
     .valid.max_access_size = 4,
+    .valid.accepts = lpc4088_gpio_memory_op_accepts,
     .endianness = DEVICE_NATIVE_ENDIAN,
 };
 
@@ -198,6 +215,7 @@ static const VMStateDescription vmstate_lpc4088_gpio = {
 static Property lpc4088_gpio_properties[] = {
     DEFINE_PROP_STRING("port-name", LPC4088GPIOPortState, port_name),
     DEFINE_PROP_BOOL("enable-rc", LPC4088GPIOPortState, enable_rc, false),
+    DEFINE_PROP_LINK("syscon", LPC4088GPIOPortState, sc, TYPE_LPC4088_SC, LPC4088SCState *),
     DEFINE_PROP_END_OF_LIST(),
 };
 

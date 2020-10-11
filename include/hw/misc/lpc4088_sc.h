@@ -60,6 +60,8 @@
 #define PLL_FEED_STATE_FEED1 1
 #define PLL_FEED_STATE_FEED2 2
 
+#define LPC4088_PCONP_GPIO_MASK (1 << 15)
+
 typedef struct LPC4088SCState {
     /* <private> */
     SysBusDevice parent_obj;
