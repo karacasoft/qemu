@@ -13,13 +13,13 @@
 #include "hw/timer/lpc4088_timer.h"
 #include "hw/timer/lpc4088_pwm.h"
 #include "hw/adc/lpc4088_adc.h"
+#include "hw/adc/lpc4088_dac.h"
 #include "hw/char/lpc4088_usart.h"
 #include "hw/misc/lpc4088_sc.h"
 #include "hw/misc/lpc4088_iocon.h"
 
 #define TYPE_LPC4088FET208 "lpc4088fet208"
-#define LPC4088FET208(obj) \
-    OBJECT_CHECK(LPC4088FET208State, (obj), TYPE_LPC4088FET208)
+#define LPC4088FET208(obj) OBJECT_CHECK(LPC4088FET208State, (obj), TYPE_LPC4088FET208)
 
 #define LPC4088_FLASH_BASE_ADDRESS 0x00000000
 #define LPC4088FET208_FLASH_SIZE 0x00080000
@@ -33,6 +33,7 @@
 #define LPC4088_NR_TIMERS 4
 #define LPC4088_NR_PWMS 2
 #define LPC4088_NR_ADCS 1
+#define LPC4088_NR_DACS 1
 #define LPC4088_NR_USARTS 5
 
 typedef struct LPC4088FET208State {
@@ -50,6 +51,7 @@ typedef struct LPC4088FET208State {
 	LPC4088TimerState timer[LPC4088_NR_TIMERS];
 	LPC4088PWMState pwm[LPC4088_NR_PWMS];
 	LPC4088ADCState adc[LPC4088_NR_ADCS];
+	LPC4088DACState dac[LPC4088_NR_DACS];
 	LPC4088USARTState usart[LPC4088_NR_USARTS];
 
     qemu_irq hardfault_input_irq;

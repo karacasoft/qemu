@@ -1,30 +1,56 @@
 #include "qemu/osdep.h"
-#include "hw/sysbus.h"
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
+#include "hw/adc/lpc4088_adc.h"
 #include "migration/vmstate.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
-#include "hw/adc/lpc4088_adc.h"
+#include "qapi/error.h"
 
-#ifndef LPC4088_ADC_ERR_DEBUG
-#define LPC4088_ADC_ERR_DEBUG 0
+#ifndef LPC4088_ADC_ERROR_DEBUG
+#define LPC4088_ADC_ERROR_DEBUG 0
 #endif
 
-#define DB_PRINT_L(lvl, fmt, args...) do { \
-    if (LPC4088_ADC_ERR_DEBUG >= lvl) { \
-        qemu_log("%s: " fmt, __func__, ## args); \
-    } \
-} while (0)
+#define DEBUG_PRINT(fmt, args...) if(LPC4088_ADC_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_ADC,__func__, ##args);}
 
-#define DB_PRINT(fmt, args...) DB_PRINT_L(1, fmt, ## args)
+#define REMOTE_CTRL_ADC_MAGIC 0xDEEDBEE5
 
-#define DPRINTF2(fmt, args...) \
-    if(LPC4088_ADC_ERR_DEBUG) { \
-        fprintf(stderr, "[%s]%s: " fmt, TYPE_LPC4088_ADC, \
-                __func__, ##args); \
+static const char *lpc4088_adc_register_name(uint32_t offset) __attribute__((unused));
+
+static const char *lpc4088_adc_register_name(uint32_t offset) {
+	switch (offset) {
+    case LPC4088_ADC_REG_CR:
+        return "ADC_CR";
+    case LPC4088_ADC_REG_GDR:
+        return "ADC_GDR";
+	case LPC4088_ADC_REG_INTEN:
+        return "ADC_INTERN";
+	case LPC4088_ADC_REG_DR0:
+        return "ADC_DR0";
+	case LPC4088_ADC_REG_DR1:
+        return "ADC_DR1";
+	case LPC4088_ADC_REG_DR2:
+        return "ADC_DR2";
+	case LPC4088_ADC_REG_DR3:
+        return "ADC_DR3";
+	case LPC4088_ADC_REG_DR4:
+        return "ADC_DR4";
+	case LPC4088_ADC_REG_DR5:
+        return "ADC_DR5";
+	case LPC4088_ADC_REG_DR6:
+        return "ADC_DR6";
+	case LPC4088_ADC_REG_DR7:
+        return "ADC_DR7";
+	case LPC4088_ADC_REG_STAT:
+        return "ADC_STAT";
+	case LPC4088_ADC_REG_ADTRM:
+        return "ADC_ADTRM";
+    default:
+        return "ADC_[?]";
     }
+}
 
-static void lpc4088_adc_reset(DeviceState *dev)
-{
+static void lpc4088_adc_reset(DeviceState *dev) {
     LPC4088ADCState *s = LPC4088ADC(dev);
 
 	s->adc_CR = 0x00000000;
@@ -40,6 +66,9 @@ static void lpc4088_adc_reset(DeviceState *dev)
 	s->adc_DR7 = 0x00000000;
 	s->adc_STAT = 0x00000000;
 	s->adc_ADTRM = 0x00000000;
+	
+	s->lastData = 0x00000000;
+	s->enableRemoteInterrupt = 0;
 }
 
 
@@ -54,15 +83,11 @@ static uint32_t lpc4088_adc_generate_value(LPC4088ADCState *s)
     return s->adc_DR0;
 }
 
-static uint64_t lpc4088_adc_read(void *opaque, hwaddr addr,
-                                     unsigned int size)
+static uint64_t lpc4088_adc_read(void *opaque, hwaddr offset, unsigned int size)
 {
     LPC4088ADCState *s = opaque;
 
-    DB_PRINT("Address: 0x%" HWADDR_PRIx "\n", addr);
-
-
-    switch (addr) {
+    switch (offset) {
     case LPC4088_ADC_REG_CR:
         return s->adc_CR;
     case LPC4088_ADC_REG_GDR:
@@ -90,27 +115,25 @@ static uint64_t lpc4088_adc_read(void *opaque, hwaddr addr,
 	case LPC4088_ADC_REG_ADTRM:
         return s->adc_ADTRM;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, addr);
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, offset);
     }
 
     return 0;
 }
 
-static void lpc4088_adc_write(void *opaque, hwaddr addr,
-                       uint64_t val64, unsigned int size)
-{
+static void lpc4088_adc_write(void *opaque, hwaddr offset, uint64_t val64, unsigned int size) {
     LPC4088ADCState *s = opaque;
     uint32_t value = (uint32_t) val64;
 
-    DB_PRINT("Address: 0x%" HWADDR_PRIx ", Value: 0x%x\n",
-             addr, value);
-			 
-	DPRINTF2("(%s, value = 0x%" PRIx32 ")\n","Deneme ADC",
-            (uint32_t) value);
+	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_adc_register_name(offset), (uint32_t) offset);
 
-    switch (addr) {
+    switch (offset) {
     case LPC4088_ADC_REG_CR:
+		if(((s->adc_CR & (1 << 24)) != 0)) {
+			if(((s->adc_CR & (1 << 1)) != 0)) {
+				
+			}
+		}
         s->adc_CR = value;
         break;
     case LPC4088_ADC_REG_GDR:
@@ -150,8 +173,16 @@ static void lpc4088_adc_write(void *opaque, hwaddr addr,
         s->adc_ADTRM = value;
         break;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, addr);
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, offset);
+    }
+}
+
+static void lpc4088_adc_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlMessage *msg) {
+    LPC4088ADCState *s = LPC4088ADC(rcs->connected_device);
+    
+	if(s->enable_rc) {
+		if(msg->arg1 == s->adc_name[0] && msg->arg2 < 32) {
+		}
     }
 }
 
@@ -185,23 +216,52 @@ static const VMStateDescription vmstate_lpc4088_adc = {
     }
 };
 
-static void lpc4088_adc_init(Object *obj)
-{
-    LPC4088ADCState *s = LPC4088ADC(obj);
+static Property lpc4088_adc_properties[] = {
+	DEFINE_PROP_STRING("adc-name", struct LPC4088ADCState, adc_name),
+    DEFINE_PROP_BOOL("enable-rc", struct LPC4088ADCState, enable_rc, false),
+    DEFINE_PROP_END_OF_LIST(),
+};
 
-    sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
+static void lpc4088_adc_init(Object *obj) {
+    LPC4088ADCState *s = LPC4088ADC(obj);
+	
+	DeviceState *ds = DEVICE(obj);
+	
+	object_initialize_child_with_props(
+        obj, "RemoteCtrl", &s->rcs,
+        sizeof(RemoteCtrlState), TYPE_REMOTE_CTRL, &error_abort,
+        NULL
+    );
+
+    s->rcs.connected_device = ds;
+
+    /*sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
 
     memory_region_init_io(&s->mmio, obj, &lpc4088_adc_ops, s,
                           TYPE_LPC4088_ADC, LPC4088_ADC_MEM_SIZE);
-    sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);
+    sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);*/
 }
 
-static void lpc4088_adc_class_init(ObjectClass *klass, void *data)
-{
+static void lpc4088_adc_realize(DeviceState *dev, Error **errp) {
+    LPC4088ADCState *s = LPC4088ADC(dev);
+
+	sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq);
+	
+	memory_region_init_io(&s->iomem, OBJECT(s), &lpc4088_adc_ops, s, TYPE_LPC4088_ADC, LPC4088_ADC_MEM_SIZE);
+
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
+
+    s->rcs.callback = lpc4088_adc_remote_ctrl_callback;
+    qdev_realize(DEVICE(&s->rcs), qdev_get_parent_bus(DEVICE(&s->rcs)), errp);
+}
+
+static void lpc4088_adc_class_init(ObjectClass *klass, void *data) {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
     dc->reset = lpc4088_adc_reset;
+	device_class_set_props(dc, lpc4088_adc_properties);
     dc->vmsd = &vmstate_lpc4088_adc;
+	dc->realize = lpc4088_adc_realize;
 }
 
 static const TypeInfo lpc4088_adc_info = {
@@ -212,8 +272,7 @@ static const TypeInfo lpc4088_adc_info = {
     .class_init    = lpc4088_adc_class_init,
 };
 
-static void lpc4088_adc_register_types(void)
-{
+static void lpc4088_adc_register_types(void) {
     type_register_static(&lpc4088_adc_info);
 }
 

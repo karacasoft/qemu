@@ -2,6 +2,7 @@
 #define __LPC4088_ADC_H__
 
 #include "hw/sysbus.h"
+#include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_ADC "lpc4088-adc"
 
@@ -28,7 +29,11 @@ typedef struct LPC4088ADCState {
     SysBusDevice parent_obj;
 
     /* <public> */
-    MemoryRegion mmio;
+    MemoryRegion iomem;
+	
+	char *adc_name;
+    bool enable_rc;
+	uint32_t enableRemoteInterrupt;
 
     uint32_t adc_CR;
     uint32_t adc_GDR;
@@ -45,6 +50,10 @@ typedef struct LPC4088ADCState {
 	uint32_t adc_ADTRM;
 	
     qemu_irq irq;
+	
+	RemoteCtrlState rcs;
+	uint32_t lastData;
+	
 } LPC4088ADCState;
 
-#endif /* HW_STM32F2XX_ADC_H */
+#endif /* __LPC4088_ADC_H__ */

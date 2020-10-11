@@ -9,6 +9,8 @@
 
 #define LPC4088PWM(obj) OBJECT_CHECK(LPC4088PWMState, (obj), TYPE_LPC4088_PWM)
 
+#define LPC4088_PWM_TIMER_FREQUENCY 0x3938700
+
 #define LPC4088_PWM_MEM_SIZE 0x080
 
 #define LPC4088_PWM_REG_IR 0x000
@@ -42,6 +44,9 @@ typedef struct LPC4088PWMState {
     MemoryRegion iomem;
     QEMUTimer *timer;
     qemu_irq irq;
+	
+	char *pwm_name;
+	uint32_t enableRemoteInterrupt;
 
     int64_t tick_offset;
     uint64_t hit_time;

@@ -2,6 +2,7 @@
 #define __LPC4088_DAC_H__
 
 #include "hw/sysbus.h"
+#include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_DAC "lpc4088-dac"
 
@@ -18,13 +19,20 @@ typedef struct LPC4088DACState {
     SysBusDevice parent_obj;
 
     /* <public> */
-    MemoryRegion mmio;
+    MemoryRegion iomem;
+	
+	char *dac_name;
+    bool enable_rc;
+	uint32_t enableRemoteInterrupt;
 
     uint32_t dac_CR;
     uint32_t dac_CTRL;
     uint32_t dac_CNTVAL;
 	
     qemu_irq irq;
+	
+	RemoteCtrlState rcs;
+	
 } LPC4088DACState;
 
 #endif /* __LPC4088_DAC_H__ */

@@ -3,11 +3,11 @@
 
 #include "hw/sysbus.h"
 #include "chardev/char-fe.h"
-
+#include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_USART "lpc4088-usart"
-#define LPC4088USART(obj) \
-    OBJECT_CHECK(LPC4088USARTState, (obj), TYPE_LPC4088_USART)
+
+#define LPC4088USART(obj) OBJECT_CHECK(LPC4088USARTState, (obj), TYPE_LPC4088_USART)
 
 #define LPC4088_USART_MEM_SIZE 0x060
 
@@ -36,8 +36,11 @@ typedef struct LPC4088USARTState {
     SysBusDevice parent_obj;
 
     /* <public> */
-    MemoryRegion mmio;
+    MemoryRegion iomem;
 	
+	char *usart_name;
+    bool enable_rc;
+	uint32_t enableRemoteInterrupt;
 	
     uint32_t usart_RBR;
 	uint32_t usart_THR;
@@ -61,5 +64,8 @@ typedef struct LPC4088USARTState {
 
     CharBackend chr;
     qemu_irq irq;
+	
+	RemoteCtrlState rcs;
+	
 } LPC4088USARTState;
 #endif
