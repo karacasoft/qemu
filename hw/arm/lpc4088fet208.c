@@ -122,7 +122,6 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
         return;
     }
 
-
     //////////////////////// SYSCON //////////////////////////////
     sysbus_realize(SYS_BUS_DEVICE(&s->syscon), &err);
     if(err != NULL)
@@ -136,6 +135,17 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
             qdev_get_gpio_in(dev_soc, 0));
     ///////////////////////// SYSCON END /////////////////////////
 	
+    //////////////////////// IOCON //////////////////////////////
+    sysbus_realize(SYS_BUS_DEVICE(&s->iocon), &err);
+    if(err != NULL)
+    {
+        error_propagate(errp, err);
+        return;
+    }
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->iocon), 0, LPC4088_IOCON_BASE_ADDR);
+    ///////////////////////// IOCON END /////////////////////////
+	
+
     ///////////////////// USART //////////////////////////////////
 	for (i = 0; i < LPC4088_NR_USARTS; i++) {
         DeviceState *dev = DEVICE(&(s->usart[i]));

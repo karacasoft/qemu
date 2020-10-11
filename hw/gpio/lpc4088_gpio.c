@@ -282,7 +282,7 @@ static void lpc4088_gpio_realize(DeviceState *dev, Error **errp)
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
 
     s->rcs.callback = lpc4088_gpio_remote_ctrl_callback;
-    qdev_realize(DEVICE(&s->rcs), qdev_get_parent_bus(DEVICE(&s->rcs)), errp);
+    qdev_realize(DEVICE(&s->rcs), NULL, NULL);
     
 }
 
@@ -303,7 +303,7 @@ static void lpc4088_gpio_instance_init(Object *obj)
     DeviceState *ds = DEVICE(obj);
     
     object_initialize_child_with_props(
-        obj, "RemoteCtrl", &s->rcs,
+        obj, "gpio-rcs", &s->rcs,
         sizeof(RemoteCtrlState), TYPE_REMOTE_CTRL, &error_abort,
         NULL
     );
