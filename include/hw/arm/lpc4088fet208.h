@@ -15,6 +15,7 @@
 #include "hw/adc/lpc4088_adc.h"
 #include "hw/char/lpc4088_usart.h"
 #include "hw/misc/lpc4088_sc.h"
+#include "hw/misc/lpc4088_iocon.h"
 
 #define TYPE_LPC4088FET208 "lpc4088fet208"
 #define LPC4088FET208(obj) \
@@ -43,6 +44,7 @@ typedef struct LPC4088FET208State {
     ARMv7MState armv7m;
 
     LPC4088SCState syscon;
+    LPC4088IOCONState iocon;
 
     LPC4088GPIOPortState gpio[LPC4088_NR_GPIO_PORTS];
 	LPC4088TimerState timer[LPC4088_NR_TIMERS];

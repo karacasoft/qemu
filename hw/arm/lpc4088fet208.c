@@ -50,6 +50,7 @@ static void lpc4088fet208_init(Object *obj)
 
     object_initialize_child(obj, "armv7m", &s->armv7m, TYPE_ARMV7M);
     object_initialize_child(obj, "syscon", &s->syscon, TYPE_LPC4088_SC);
+    object_initialize_child(obj, "iocon", &s->iocon, TYPE_LPC4088_IOCON);
 
     for (i = 0; i < LPC4088_NR_GPIO_PORTS; i++)
     {
@@ -96,11 +97,13 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp)
 
     memory_region_init_rom(flash, OBJECT(dev_soc),
             "LPC4088FET208.flash", LPC4088FET208_FLASH_SIZE, &error_fatal);
-    memory_region_add_subregion(system_memory, LPC4088_FLASH_BASE_ADDRESS, flash);
+    memory_region_add_subregion(system_memory, LPC4088_FLASH_BASE_ADDRESS,
+            flash);
 
     memory_region_init_ram(sram, NULL, "LPC4088FET208.sram",
             LPC4088FET208_SRAM_SIZE, &error_fatal);
-    memory_region_add_subregion(system_memory, LPC4088FET208_SRAM_BASE_ADDRESS, sram);
+    memory_region_add_subregion(system_memory,
+            LPC4088FET208_SRAM_BASE_ADDRESS, sram);
 
     qdev_init_gpio_in(dev_soc, lpc4088fet208_trigger_hard_fault, 1);
 

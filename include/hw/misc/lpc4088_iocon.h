@@ -368,7 +368,6 @@ typedef struct LPC4088IOCONState {
 	uint32_t iocon_P5_3;
 	uint32_t iocon_P5_4;				/* 0x290 */
 
-    qemu_irq irq;
 } LPC4088IOCONState;
 
 #endif /* __LPC4088_IOCON_H__ */
