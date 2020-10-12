@@ -18,6 +18,7 @@
 #define REMOTE_CTRL_CMD_TIMER_CAPTURE   0x11000100
 
 static void lpc4088_timer_set_alarm(LPC4088TimerState *s);
+static void lpc4088_timer_remote_ctrl_send_register(LPC4088TimerState *s, hwaddr offset, uint32_t val);
 
 static const char *lpc4088_timer_register_name(uint32_t offset) {
     switch (offset) {
@@ -377,7 +378,7 @@ static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset, unsigned size) {
 
 static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, unsigned size) {
     LPC4088TimerState *s = opaque;
-    uint32_t value = val64;
+    uint32_t value = (uint32_t) val64;
 
     if(
         ((s->timer_name[0] == '0') && !(s->syscon->sc_PCONP & (1 << 1))) ||
@@ -388,6 +389,7 @@ static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, uns
         qemu_irq_pulse(s->syscon->hard_fault_irq);
     }
 
+    lpc4088_timer_remote_ctrl_send_register(s, offset, value);
     
     DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_timer_register_name(offset), (uint32_t) value);
 
@@ -512,6 +514,25 @@ static void lpc4088_timer_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlM
                 }
             }
         }
+    }
+}
+
+static void lpc4088_timer_remote_ctrl_send_register(LPC4088TimerState *s, hwaddr offset, uint32_t val) {
+    if(s->enable_rc) {
+        RemoteCtrlClass *rcc = REMOTE_CTRL_GET_CLASS(&s->rcs);
+
+        RemoteCtrlMessage msg = {
+            .magic = REMOTE_CTRL_TIMER_MAGIC,
+            .cmd = 0,
+            .arg1 = s->timer_name[0],
+            .arg2 = offset,
+            .arg3 = val,
+            .arg4 = 0,
+            .arg5 = 0,
+            .arg6 = 0
+        };
+
+        rcc->send_message(&s->rcs, (void *)&msg, sizeof(RemoteCtrlMessage));
     }
 }
 
