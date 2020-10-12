@@ -63,8 +63,10 @@ static void lpc4088_adc_timer_interrupt(void *opaque) {
 			lastDRData = lastDRData | s->lastD1Data << 4;
 			lastDRData = lastDRData | 1 << 31;
 			s->adc_DR1 = lastDRData;
-					
-			qemu_irq_pulse(s->irq);
+			
+			if((s->adc_INTEN & (1 << 1)) != 0) {
+				qemu_irq_pulse(s->irq);
+			}			
 		}
 		else if(((s->adc_CR & (1 << 2)) != 0)) {
 			lastDRData = s->adc_DR2;
@@ -73,7 +75,9 @@ static void lpc4088_adc_timer_interrupt(void *opaque) {
 			lastDRData = lastDRData | 1 << 31;
 			s->adc_DR2 = lastDRData;
 					
-			qemu_irq_pulse(s->irq);
+			if((s->adc_INTEN & (1 << 2)) != 0) {
+				qemu_irq_pulse(s->irq);
+			}
 		}
 		else if(((s->adc_CR & (1 << 3)) != 0)) {
 			lastDRData = s->adc_DR3;
@@ -82,7 +86,9 @@ static void lpc4088_adc_timer_interrupt(void *opaque) {
 			lastDRData = lastDRData | 1 << 31;
 			s->adc_DR3 = lastDRData;
 					
-			qemu_irq_pulse(s->irq);
+			if((s->adc_INTEN & (1 << 3)) != 0) {
+				qemu_irq_pulse(s->irq);
+			}
 		}
 		else if(((s->adc_CR & (1 << 4)) != 0)) {
 			lastDRData = s->adc_DR4;
@@ -91,7 +97,9 @@ static void lpc4088_adc_timer_interrupt(void *opaque) {
 			lastDRData = lastDRData | 1 << 31;
 			s->adc_DR4 = lastDRData;
 					
-			qemu_irq_pulse(s->irq);
+			if((s->adc_INTEN & (1 << 4)) != 0) {
+				qemu_irq_pulse(s->irq);
+			}
 		}
 		else if(((s->adc_CR & (1 << 5)) != 0)) {
 			lastDRData = s->adc_DR5;
@@ -100,7 +108,9 @@ static void lpc4088_adc_timer_interrupt(void *opaque) {
 			lastDRData = lastDRData | 1 << 31;
 			s->adc_DR5 = lastDRData;
 					
-			qemu_irq_pulse(s->irq);
+			if((s->adc_INTEN & (1 << 5)) != 0) {
+				qemu_irq_pulse(s->irq);
+			}
 		}
 		else if(((s->adc_CR & (1 << 6)) != 0)) {
 			lastDRData = s->adc_DR6;
@@ -109,7 +119,9 @@ static void lpc4088_adc_timer_interrupt(void *opaque) {
 			lastDRData = lastDRData | 1 << 31;
 			s->adc_DR6 = lastDRData;
 					
-			qemu_irq_pulse(s->irq);
+			if((s->adc_INTEN & (1 << 6)) != 0) {
+				qemu_irq_pulse(s->irq);
+			}
 		}
 		else if(((s->adc_CR & (1 << 7)) != 0)) {
 			lastDRData = s->adc_DR7;
@@ -118,7 +130,9 @@ static void lpc4088_adc_timer_interrupt(void *opaque) {
 			lastDRData = lastDRData | 1 << 31;
 			s->adc_DR7 = lastDRData;
 					
-			qemu_irq_pulse(s->irq);
+			if((s->adc_INTEN & (1 << 7)) != 0) {
+				qemu_irq_pulse(s->irq);
+			}
 		}
 		else {
 			lastDRData = s->adc_DR0;
@@ -127,7 +141,9 @@ static void lpc4088_adc_timer_interrupt(void *opaque) {
 			lastDRData = lastDRData | 1 << 31;
 			s->adc_DR0 = lastDRData;
 					
-			qemu_irq_pulse(s->irq);
+			if((s->adc_INTEN & (1 << 0)) != 0) {
+				qemu_irq_pulse(s->irq);
+			}
 		}
 	}
 	
@@ -235,19 +251,19 @@ static uint64_t lpc4088_adc_read(void *opaque, hwaddr offset, unsigned int size)
 static void lpc4088_adc_write(void *opaque, hwaddr offset, uint64_t val64, unsigned int size) {
     LPC4088ADCState *s = opaque;
     uint32_t value = (uint32_t) val64;
-	int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
-    uint32_t timer_val = 0;
+	//int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+    //uint32_t timer_val = 0;
 
 	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_adc_register_name(offset), (uint32_t) value);
 
     switch (offset) {
     case LPC4088_ADC_REG_CR:
 		s->adc_CR = value;
-		if(((s->adc_CR & (1 << 24)) != 0)) {
+		/*if(((s->adc_CR & (1 << 24)) != 0)) {
 			timer_val = lpc4088_ns_to_ticks(s, now) - s->tick_offset;
 			s->tick_offset = lpc4088_ns_to_ticks(s, now) - timer_val;
 			lpc4088_adc_timer_set_alarm(s, now);
-		}
+		}*/
         break;
     case LPC4088_ADC_REG_GDR:
         s->adc_GDR = value;
@@ -375,7 +391,7 @@ static void lpc4088_adc_init(Object *obj) {
     );
 
     s->rcs.connected_device = ds;
-
+	
     /*sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
 
     memory_region_init_io(&s->mmio, obj, &lpc4088_adc_ops, s,
@@ -385,7 +401,9 @@ static void lpc4088_adc_init(Object *obj) {
 
 static void lpc4088_adc_realize(DeviceState *dev, Error **errp) {	
     LPC4088ADCState *s = LPC4088ADC(dev);
-
+	int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+    uint32_t timer_val = 0;
+	
 	sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq);
 	
 	memory_region_init_io(&s->iomem, OBJECT(s), &lpc4088_adc_ops, s, TYPE_LPC4088_ADC, LPC4088_ADC_MEM_SIZE);
@@ -393,7 +411,11 @@ static void lpc4088_adc_realize(DeviceState *dev, Error **errp) {
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
 
 	s->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, lpc4088_adc_timer_interrupt, s);
-
+	
+	timer_val = lpc4088_ns_to_ticks(s, now) - s->tick_offset;
+	s->tick_offset = lpc4088_ns_to_ticks(s, now) - timer_val;
+	lpc4088_adc_timer_set_alarm(s, now);
+	
     s->rcs.callback = lpc4088_adc_remote_ctrl_callback;
     qdev_realize(DEVICE(&s->rcs), qdev_get_parent_bus(DEVICE(&s->rcs)), errp);
 }
