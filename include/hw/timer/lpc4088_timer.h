@@ -3,13 +3,14 @@
 
 #include "hw/sysbus.h"
 #include "qemu/timer.h"
+#include "hw/misc/lpc4088_sc.h"
 #include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_TIMER "lpc4088-timer"
 
 #define LPC4088TIMER(obj) OBJECT_CHECK(LPC4088TimerState, (obj), TYPE_LPC4088_TIMER)
 
-#define LPC4088_TIMER_FREQUENCY 0x3938700
+#define LPC4088_TIMER_FREQUENCY (60*1000*1000)
 
 #define LPC4088_TIMER_MEM_SIZE 0x080
 
@@ -41,11 +42,10 @@ typedef struct LPC4088TimerState {
 	
 	char *timer_name;
     bool enable_rc;
-	uint32_t enableRemoteInterrupt;
-
-    int64_t tick_offset;
-    uint64_t hit_time;
+	
     uint64_t freq_hz;
+
+	int64_t tc_last_checked_at;
 	
 	uint32_t timer_IR;
 	uint32_t timer_TCR;
@@ -64,6 +64,7 @@ typedef struct LPC4088TimerState {
 	uint32_t timer_CTCR;
 	
 	RemoteCtrlState rcs;
+	LPC4088SCState *syscon;
 	
 } LPC4088TimerState;
 

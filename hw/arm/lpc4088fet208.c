@@ -198,6 +198,9 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
 		qdev_prop_set_string(dev, "timer-name", timer_names[i]);
         qdev_prop_set_bit(dev, "enable-rc", true);
         qdev_prop_set_uint64(dev, "clock-frequency", 60000000);
+        object_property_set_link(OBJECT(&s->timer[i]),
+                OBJECT(&s->syscon), "syscon",
+                &err);
         sysbus_realize(busdev, &err);
         if (err != NULL) {
             error_propagate(errp, err);
