@@ -77,6 +77,64 @@ static void lpc4088_timer_update_tc(LPC4088TimerState *s)
     s->tc_last_checked_at = curr_time;
 }
 
+void lpc4088_timer_do_match_event(LPC4088TimerState *s, int n) {
+    LPC4088TimerClass *tc = LPC4088TIMER_GET_CLASS(s);
+
+    tc->match_events[n](s);
+}
+
+static void lpc4088_timer_match_event0(LPC4088TimerState *s) {
+    // set external match register bit in the event of MR0
+    uint32_t emr_mr0 = (s->timer_EMR >> 4) & 3;
+    if(emr_mr0 == 3) {
+        if(s->timer_EMR & 1) { s->timer_EMR &= ~1; }
+        else { s->timer_EMR |= 1; }
+    } else if(emr_mr0 == 2) {
+        s->timer_EMR |= 1;
+    } else if(emr_mr0 == 1) {
+        s->timer_EMR &= ~1;
+    }
+}
+
+static void lpc4088_timer_match_event1(LPC4088TimerState *s) {
+    // set external match register bit in the event of MR1
+    uint32_t emr_mr1 = (s->timer_EMR >> 6) & 3;
+    if(emr_mr1 == 3) {
+        if(s->timer_EMR & (1 << 1)) { s->timer_EMR &= ~(1 << 1); }
+        else { s->timer_EMR |= (1 << 1); }
+    } else if(emr_mr1 == 2) {
+        s->timer_EMR |= (1 << 1);
+    } else if(emr_mr1 == 1) {
+        s->timer_EMR &= ~(1 << 1);
+    }
+}
+
+static void lpc4088_timer_match_event2(LPC4088TimerState *s) {
+    // set external match register bit in the event of MR2
+    uint32_t emr_mr2 = (s->timer_EMR >> 8) & 3;
+    if(emr_mr2 == 3) {
+        if(s->timer_EMR & (1 << 2)) { s->timer_EMR &= ~(1 << 2); }
+        else { s->timer_EMR |= (1 << 2); }
+    } else if(emr_mr2 == 2) {
+        s->timer_EMR |= (1 << 2);
+    } else if(emr_mr2 == 1) {
+        s->timer_EMR &= ~(1 << 2);
+    }
+}
+
+static void lpc4088_timer_match_event3(LPC4088TimerState *s) {
+    // set external match register bit in the event of MR3
+    uint32_t emr_mr3 = (s->timer_EMR >> 10) & 3;
+    if(emr_mr3 == 3) {
+        if(s->timer_EMR & (1 << 3)) { s->timer_EMR &= ~(1 << 3); }
+        else { s->timer_EMR |= (1 << 3); }
+    } else if(emr_mr3 == 2) {
+        s->timer_EMR |= (1 << 3);
+    } else if(emr_mr3 == 1) {
+        s->timer_EMR &= ~(1 << 3);
+    }
+}
+
 static void lpc4088_timer_interrupt(void *opaque) {
     LPC4088TimerState *s = opaque;
     int64_t cycles_per_us = s->freq_hz / 1000000;
@@ -111,16 +169,7 @@ static void lpc4088_timer_interrupt(void *opaque) {
                 stop_requested = true;
             }
 
-            // set external match register bit in the event of MR0
-            uint32_t emr_mr0 = (s->timer_EMR >> 4) & 3;
-            if(emr_mr0 == 3) {
-                if(s->timer_EMR & 1) { s->timer_EMR &= ~1; }
-                else { s->timer_EMR |= 1; }
-            } else if(emr_mr0 == 2) {
-                s->timer_EMR |= 1;
-            } else if(emr_mr0 == 1) {
-                s->timer_EMR &= ~1;
-            }
+            lpc4088_timer_do_match_event(s, 0);
         }
 
         
@@ -145,16 +194,7 @@ static void lpc4088_timer_interrupt(void *opaque) {
                 stop_requested = true;
             }
 
-            // set external match register bit in the event of MR1
-            uint32_t emr_mr1 = (s->timer_EMR >> 6) & 3;
-            if(emr_mr1 == 3) {
-                if(s->timer_EMR & (1 << 1)) { s->timer_EMR &= ~(1 << 1); }
-                else { s->timer_EMR |= (1 << 1); }
-            } else if(emr_mr1 == 2) {
-                s->timer_EMR |= (1 << 1);
-            } else if(emr_mr1 == 1) {
-                s->timer_EMR &= ~(1 << 1);
-            }
+            lpc4088_timer_do_match_event(s, 1);
         }
     }
 
@@ -175,16 +215,7 @@ static void lpc4088_timer_interrupt(void *opaque) {
                 stop_requested = true;
             }
 
-            // set external match register bit in the event of MR2
-            uint32_t emr_mr2 = (s->timer_EMR >> 8) & 3;
-            if(emr_mr2 == 3) {
-                if(s->timer_EMR & (1 << 2)) { s->timer_EMR &= ~(1 << 2); }
-                else { s->timer_EMR |= (1 << 2); }
-            } else if(emr_mr2 == 2) {
-                s->timer_EMR |= (1 << 2);
-            } else if(emr_mr2 == 1) {
-                s->timer_EMR &= ~(1 << 2);
-            }
+            lpc4088_timer_do_match_event(s, 2);
         }
     }
 
@@ -205,16 +236,7 @@ static void lpc4088_timer_interrupt(void *opaque) {
                 stop_requested = true;
             }
 
-            // set external match register bit in the event of MR3
-            uint32_t emr_mr3 = (s->timer_EMR >> 10) & 3;
-            if(emr_mr3 == 3) {
-                if(s->timer_EMR & (1 << 3)) { s->timer_EMR &= ~(1 << 3); }
-                else { s->timer_EMR |= (1 << 3); }
-            } else if(emr_mr3 == 2) {
-                s->timer_EMR |= (1 << 3);
-            } else if(emr_mr3 == 1) {
-                s->timer_EMR &= ~(1 << 3);
-            }
+            lpc4088_timer_do_match_event(s, 3);
         }
     }
     
@@ -321,11 +343,11 @@ static void lpc4088_timer_reset(DeviceState *dev) {
 static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset, unsigned size) {
     LPC4088TimerState *s = opaque;
 
-    if(
-        ((s->timer_name[0] == '0') && !(s->syscon->sc_PCONP & (1 << 1))) ||
+    if(s->check_syscon &&
+        (((s->timer_name[0] == '0') && !(s->syscon->sc_PCONP & (1 << 1))) ||
         ((s->timer_name[0] == '1') && !(s->syscon->sc_PCONP & (1 << 2))) ||
         ((s->timer_name[0] == '2') && !(s->syscon->sc_PCONP & (1 << 22))) ||
-        ((s->timer_name[0] == '3') && !(s->syscon->sc_PCONP & (1 << 23)))
+        ((s->timer_name[0] == '3') && !(s->syscon->sc_PCONP & (1 << 23))))
     ) {
         qemu_irq_pulse(s->syscon->hard_fault_irq);
     }
@@ -380,11 +402,11 @@ static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, uns
     LPC4088TimerState *s = opaque;
     uint32_t value = (uint32_t) val64;
 
-    if(
-        ((s->timer_name[0] == '0') && !(s->syscon->sc_PCONP & (1 << 1))) ||
+    if(s->check_syscon &&
+        (((s->timer_name[0] == '0') && !(s->syscon->sc_PCONP & (1 << 1))) ||
         ((s->timer_name[0] == '1') && !(s->syscon->sc_PCONP & (1 << 2))) ||
         ((s->timer_name[0] == '2') && !(s->syscon->sc_PCONP & (1 << 22))) ||
-        ((s->timer_name[0] == '3') && !(s->syscon->sc_PCONP & (1 << 23)))
+        ((s->timer_name[0] == '3') && !(s->syscon->sc_PCONP & (1 << 23))))
     ) {
         qemu_irq_pulse(s->syscon->hard_fault_irq);
     }
@@ -459,59 +481,69 @@ static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, uns
     }
 }
 
+static void lpc4088_timer_simulate_capture(LPC4088TimerState *s, uint8_t capture_pin, uint8_t rising_edge) {
+    lpc4088_timer_update_tc(s);
+    if(capture_pin == 0) {
+        // copy the TC value into CC0 in the case of a rising edge
+        if((s->timer_CCR & (1 << 0)) && rising_edge == 1) {
+            s->timer_CC0 = s->timer_TC;
+        }
+        // copy the TC value into CC0 in the case of a falling edge
+        if((s->timer_CCR & (1 << 1)) && rising_edge == 2) {
+            s->timer_CC0 = s->timer_TC;
+        }
+        // trigger an interrupt if corresponding flag is set
+        if(s->timer_CCR & (1 << 2) && !(s->timer_IR & (1 << 4))) {
+            s->timer_IR |= (1 << 4);
+            qemu_mutex_lock_iothread();
+            qemu_irq_pulse(s->irq);
+            qemu_mutex_unlock_iothread();
+        }
+    } else if(capture_pin == 1) {
+        // copy the TC value into CC1 in the case of a rising edge
+        if((s->timer_CCR & (1 << 3)) && rising_edge == 1) {
+            s->timer_CC1 = s->timer_TC;
+        }
+        // copy the TC value into CC1 in the case of a falling edge
+        if((s->timer_CCR & (1 << 4)) && rising_edge == 2) {
+            s->timer_CC1 = s->timer_TC;
+        }
+        // trigger an interrupt if corresponding flag is set
+        if(s->timer_CCR & (1 << 5) && !(s->timer_IR & (1 << 5))) {
+            s->timer_IR |= (1 << 5);
+            qemu_mutex_lock_iothread();
+            qemu_irq_pulse(s->irq);
+            qemu_mutex_unlock_iothread();
+        }
+    }
+    if((s->timer_CTCR & 0x3) & rising_edge) {
+        // increment TC if sent edge matches
+        if((s->timer_CTCR & (0x3 << 2)) == capture_pin) {
+            // increment TC if the signal is sent to the correct capture pin
+            if(!(s->timer_CCR & (0x7 << (capture_pin * 3)))) {
+                // p. 698 of user manual:
+                // If Counter mode is selected for a particular CAPn input in
+                // the TnCTCR, the 3 bits for that input in the Capture Control 
+                // Register (TnCCR) must be programmed as 000.
+                s->timer_TC += 1;
+            }
+        }
+    }
+}
+
+void lpc4088_timer_do_simulate_capture(LPC4088TimerState *s, uint8_t capture_pin, uint8_t rising_edge) {
+    LPC4088TimerClass *tc = LPC4088TIMER_GET_CLASS(s);
+
+    tc->simulate_capture(s, capture_pin, rising_edge);
+}
+
 static void lpc4088_timer_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlMessage *msg) {
     LPC4088TimerState *s = LPC4088TIMER(rcs->connected_device);
     
     if(s->enable_rc) {
         if(msg->arg1 == s->timer_name[0] && msg->arg2 < 2) {
             if(msg->cmd == REMOTE_CTRL_CMD_TIMER_CAPTURE) {
-                lpc4088_timer_update_tc(s);
-                if(msg->arg2 == 0) {
-                    // copy the TC value into CC0 in the case of a rising edge
-                    if((s->timer_CCR & (1 << 0)) && msg->arg3 == 1) {
-                        s->timer_CC0 = s->timer_TC;
-                    }
-                    // copy the TC value into CC0 in the case of a falling edge
-                    if((s->timer_CCR & (1 << 1)) && msg->arg3 == 2) {
-                        s->timer_CC0 = s->timer_TC;
-                    }
-                    // trigger an interrupt if corresponding flag is set
-                    if(s->timer_CCR & (1 << 2) && !(s->timer_IR & (1 << 4))) {
-                        s->timer_IR |= (1 << 4);
-                        qemu_mutex_lock_iothread();
-                        qemu_irq_pulse(s->irq);
-                        qemu_mutex_unlock_iothread();
-                    }
-                } else if(msg->arg2 == 1) {
-                    // copy the TC value into CC1 in the case of a rising edge
-                    if((s->timer_CCR & (1 << 3)) && msg->arg3 == 1) {
-                        s->timer_CC1 = s->timer_TC;
-                    }
-                    // copy the TC value into CC1 in the case of a falling edge
-                    if((s->timer_CCR & (1 << 4)) && msg->arg3 == 2) {
-                        s->timer_CC1 = s->timer_TC;
-                    }
-                    // trigger an interrupt if corresponding flag is set
-                    if(s->timer_CCR & (1 << 5) && !(s->timer_IR & (1 << 5))) {
-                        s->timer_IR |= (1 << 5);
-                        qemu_mutex_lock_iothread();
-                        qemu_irq_pulse(s->irq);
-                        qemu_mutex_unlock_iothread();
-                    }
-                }
-                if((s->timer_CTCR & 0x3) & msg->arg3) {
-                    // increment TC if sent edge matches
-                    if((s->timer_CTCR & (0x3 << 2)) == msg->arg2) {
-                        // increment TC if the signal is sent to the correct capture pin
-                        if(!(s->timer_CCR & (0x7 << (msg->arg2 * 3)))) {
-                            // p. 698 of user manual:
-                            // If Counter mode is selected for a particular CAPn input in
-                            // the TnCTCR, the 3 bits for that input in the Capture Control 
-                            // Register (TnCCR) must be programmed as 000.
-                            s->timer_TC += 1;
-                        }
-                    }
-                }
+                lpc4088_timer_do_simulate_capture(s, msg->arg2, msg->arg3);
             }
         }
     }
@@ -578,6 +610,8 @@ static Property lpc4088_timer_properties[] = {
 static void lpc4088_timer_init(Object *obj) {
     LPC4088TimerState *s = LPC4088TIMER(obj);
     DeviceState *ds = DEVICE(obj);
+
+    s->check_syscon = true;
     
     object_initialize_child_with_props(
         obj, "RemoteCtrl", &s->rcs,
@@ -607,11 +641,19 @@ static void lpc4088_timer_realize(DeviceState *dev, Error **errp) {
 
 static void lpc4088_timer_class_init(ObjectClass *klass, void *data) {
     DeviceClass *dc = DEVICE_CLASS(klass);
+    LPC4088TimerClass *tc = LPC4088TIMER_CLASS(klass);
 
     dc->reset = lpc4088_timer_reset;
     device_class_set_props(dc, lpc4088_timer_properties);
     dc->vmsd = &vmstate_lpc4088_timer;
     dc->realize = lpc4088_timer_realize;
+
+    tc->match_events[0] = lpc4088_timer_match_event0;
+    tc->match_events[1] = lpc4088_timer_match_event1;
+    tc->match_events[2] = lpc4088_timer_match_event2;
+    tc->match_events[3] = lpc4088_timer_match_event3;
+
+    tc->simulate_capture = lpc4088_timer_simulate_capture;
 }
 
 static const TypeInfo lpc4088_timer_info = {
@@ -619,6 +661,7 @@ static const TypeInfo lpc4088_timer_info = {
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(LPC4088TimerState),
     .instance_init = lpc4088_timer_init,
+    .class_size    = sizeof(LPC4088TimerClass),
     .class_init    = lpc4088_timer_class_init,
 };
 
