@@ -25,13 +25,7 @@ static const int pwm_irq[LPC4088_NR_PWMS] = {39, 9};
 static const int adc_irq[LPC4088_NR_ADCS] = {22};
 static const int usart_irq[LPC4088_NR_USARTS] = {5, 6, 7, 8, 35};
 
-static const char *gpio_names[] = {"0", "1", "2", "3", "4", "5" };
-static const char *timer_names[] = {"0", "1", "2", "3", "4" };
-static const char *pwm_names[] = {"0", "1"};
-static const char *adc_names[] = {"0"};
-static const char *dac_names[] = {"0"};
-static const char *usart_names[] = {"0", "1", "2", "3", "4"};
-
+static const char *names[] = {"0", "1", "2", "3", "4", "5" };
 
 #define NAME_SIZE 20
 
@@ -158,9 +152,8 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
         DeviceState *dev = DEVICE(&(s->usart[i]));
         SysBusDevice *busdev = SYS_BUS_DEVICE(&s->usart[i]);
 
-        qdev_prop_set_string(dev, "usart-name", usart_names[i]);
+        qdev_prop_set_string(dev, "usart-name", names[i]);
         qdev_prop_set_bit(dev, "enable-rc", true);
-        qdev_prop_set_chr(dev, "chardev", serial_hd(i));
         sysbus_realize(busdev, &err);
         if (err != NULL) {
             error_propagate(errp, err);
@@ -174,7 +167,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
     ///////////////////////// GPIO ///////////////////////////////
     for (i = 0; i < LPC4088_NR_GPIO_PORTS; i++)
     {
-        qdev_prop_set_string(DEVICE(&s->gpio[i]), "port-name", gpio_names[i]);
+        qdev_prop_set_string(DEVICE(&s->gpio[i]), "port-name", names[i]);
         qdev_prop_set_bit(DEVICE(&s->gpio[i]), "enable-rc", true);
         object_property_set_link(OBJECT(&s->gpio[i]),
                 OBJECT(&s->syscon), "syscon",
@@ -195,7 +188,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
         DeviceState *dev = DEVICE(&(s->timer[i]));
         SysBusDevice *busdev = SYS_BUS_DEVICE(&(s->timer[i]));
 
-		qdev_prop_set_string(dev, "timer-name", timer_names[i]);
+		qdev_prop_set_string(dev, "timer-name", names[i]);
         qdev_prop_set_bit(dev, "enable-rc", true);
         qdev_prop_set_uint64(dev, "clock-frequency", 60000000);
         object_property_set_link(OBJECT(&s->timer[i]),
@@ -216,7 +209,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
         DeviceState *dev = DEVICE(&(s->pwm[i]));
         SysBusDevice *busdev = SYS_BUS_DEVICE(dev);
 
-		qdev_prop_set_string(dev, "pwm-name", pwm_names[i]);
+		qdev_prop_set_string(dev, "pwm-name", names[i]);
         qdev_prop_set_bit(dev, "enable-rc", true);
         qdev_prop_set_uint64(dev, "clock-frequency", 60000000);
         sysbus_realize(busdev, &err);
@@ -232,7 +225,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
     ///////////////////////// ADC ////////////////////////////////
 	for (i = 0; i < LPC4088_NR_ADCS; i++) {
         SysBusDevice *busdev = SYS_BUS_DEVICE(&s->adc[i]);
-		qdev_prop_set_string(DEVICE(&s->adc[i]), "adc-name", adc_names[i]);
+		qdev_prop_set_string(DEVICE(&s->adc[i]), "adc-name", names[i]);
         qdev_prop_set_bit(DEVICE(&s->adc[i]), "enable-rc", true);
 		
         sysbus_realize(busdev, &err);
@@ -250,7 +243,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
 	for (i = 0; i < LPC4088_NR_DACS; i++) {
         DeviceState *dev = DEVICE(&(s->dac[i]));
         SysBusDevice *busdev = SYS_BUS_DEVICE(&s->dac[i]);
-		qdev_prop_set_string(dev, "dac-name", dac_names[i]);
+		qdev_prop_set_string(dev, "dac-name", names[i]);
         qdev_prop_set_bit(dev, "enable-rc", true);
 		
         sysbus_realize(SYS_BUS_DEVICE(&s->dac[i]), &err);
