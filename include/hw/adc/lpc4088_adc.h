@@ -2,11 +2,14 @@
 #define __LPC4088_ADC_H__
 
 #include "hw/sysbus.h"
+#include "qemu/timer.h"
 #include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_ADC "lpc4088-adc"
 
 #define LPC4088ADC(obj) OBJECT_CHECK(LPC4088ADCState, (obj), TYPE_LPC4088_ADC)
+
+#define LPC4088_ADC_TIMER_FREQUENCY 0xF4240
 
 #define LPC4088_ADC_MEM_SIZE 0x040
 
@@ -30,6 +33,12 @@ typedef struct LPC4088ADCState {
 
     /* <public> */
     MemoryRegion iomem;
+	QEMUTimer *timer;
+	
+	int64_t tick_offset;
+    uint64_t hit_time;
+    uint64_t freq_hz;
+	uint32_t ADCPR;
 	
 	char *adc_name;
     bool enable_rc;
@@ -52,7 +61,14 @@ typedef struct LPC4088ADCState {
     qemu_irq irq;
 	
 	RemoteCtrlState rcs;
-	uint32_t lastData;
+	uint32_t lastD0Data;
+	uint32_t lastD1Data;
+	uint32_t lastD2Data;
+	uint32_t lastD3Data;
+	uint32_t lastD4Data;
+	uint32_t lastD5Data;
+	uint32_t lastD6Data;
+	uint32_t lastD7Data;
 	
 } LPC4088ADCState;
 

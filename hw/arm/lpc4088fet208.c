@@ -224,10 +224,12 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
 	
     ///////////////////////// ADC ////////////////////////////////
 	for (i = 0; i < LPC4088_NR_ADCS; i++) {
+        DeviceState *dev = DEVICE(&(s->adc[i]));
         SysBusDevice *busdev = SYS_BUS_DEVICE(&s->adc[i]);
-		qdev_prop_set_string(DEVICE(&s->adc[i]), "adc-name", names[i]);
-        qdev_prop_set_bit(DEVICE(&s->adc[i]), "enable-rc", true);
+		qdev_prop_set_string(dev, "adc-name", names[i]);
+        qdev_prop_set_bit(dev, "enable-rc", true);
 		
+        qdev_prop_set_uint64(dev, "clock-frequency", 1000000);
         sysbus_realize(busdev, &err);
         if (err != NULL) {
             error_propagate(errp, err);
@@ -246,6 +248,7 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
 		qdev_prop_set_string(dev, "dac-name", names[i]);
         qdev_prop_set_bit(dev, "enable-rc", true);
 		
+		dev = DEVICE(&(s->dac[i]));
         sysbus_realize(SYS_BUS_DEVICE(&s->dac[i]), &err);
         if (err != NULL) {
             error_propagate(errp, err);
