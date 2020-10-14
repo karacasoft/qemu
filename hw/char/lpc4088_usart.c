@@ -79,6 +79,15 @@ static void lpc4088_usart_interrupt(LPC4088USARTState *s) {
     }
 }
 
+static void lpc4088_usart_send_char_interrupt(void *opaque) {
+    LPC4088USARTState *s = LPC4088USART(opaque);
+
+    if(s->usart_IER & (1 << 1)) {
+        s->thre_interrupt_active = true;
+        lpc4088_usart_interrupt(s);
+    }
+}
+
 static void lpc4088_usart_receive(LPC4088USARTState *opaque, const char *buf) {
     LPC4088USARTState *s = LPC4088USART(opaque);
 
@@ -228,8 +237,11 @@ static void lpc4088_usart_write(void *opaque, hwaddr offset, uint64_t val64, uns
         } else {
             char ch = value & 0xFF;
             lpc4088_usart_send(s, ch);
-            return;
+            // 10 chars per ms
+            // equivalent to almost 9600 baud
+            timer_mod_ns(s->send_char_timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + (1000 * 100));
         }
+        return;
 	case LPC4088_USART_REG_DLM:
         if(s->usart_LCR & (1 << 7)) {
             s->usart_DLM = value;
@@ -351,6 +363,8 @@ static void lpc4088_usart_init(Object *obj) {
 static void lpc4088_usart_realize(DeviceState *dev, Error **errp) {
     LPC4088USARTState *s = LPC4088USART(dev);
 	
+    s->send_char_timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, lpc4088_usart_send_char_interrupt, s);
+
 	sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &lpc4088_usart_ops, s, TYPE_LPC4088_USART, LPC4088_USART_MEM_SIZE);

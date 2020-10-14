@@ -76,6 +76,7 @@ typedef struct LPC4088USARTState {
 	uint32_t usart_RS485ADRMATCH;
 	uint32_t usart_RS485DLY;
 
+	QEMUTimer *send_char_timer;
     qemu_irq irq;
 	
 	RemoteCtrlState rcs;
