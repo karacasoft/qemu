@@ -156,7 +156,7 @@ static void lpc4088_timer_interrupt(void *opaque) {
 
         // There is some inconsistency between time measurements so we
         // use a threshold to determine if we have hit the MATCH register
-        if(mr0_time_left > -400 && mr0_time_left < 0) {
+        if(mr0_time_left > -400 && mr0_time_left <= 0) {
             
             if(s->timer_MCR & (1 << 0) && !(s->timer_IR & (1 << 0))) {
                 s->timer_IR |= (1 << 0);
@@ -182,7 +182,7 @@ static void lpc4088_timer_interrupt(void *opaque) {
 
         // TODO we probably could have used an array to simulate
         // match registers and iterate over them using a loop
-        if(mr1_time_left > -400 && mr1_time_left < 0) {
+        if(mr1_time_left > -400 && mr1_time_left <= 0) {
             if(s->timer_MCR & (1 << 3) && !(s->timer_IR & (1 << 1))) {
                 s->timer_IR |= (1 << 1);
                 interrupt_requested = true;
@@ -203,7 +203,7 @@ static void lpc4088_timer_interrupt(void *opaque) {
         int64_t mr2_tc_left = (int64_t) s->timer_MR2 - (int64_t) s->timer_TC;
         mr2_time_left = (mr2_tc_left / cycles_per_us) / (s->timer_PR + 1);
 
-        if(mr2_time_left > -400 && mr2_time_left < 0) {
+        if(mr2_time_left > -400 && mr2_time_left <= 0) {
             if(s->timer_MCR & (1 << 6) && !(s->timer_IR & (1 << 2))) {
                 s->timer_IR |= (1 << 2);
                 interrupt_requested = true;
@@ -224,7 +224,7 @@ static void lpc4088_timer_interrupt(void *opaque) {
         int64_t mr3_tc_left = (int64_t) s->timer_MR3 - (int64_t) s->timer_TC;
         mr3_time_left = (mr3_tc_left / cycles_per_us) / (s->timer_PR + 1);
 
-        if(mr3_time_left > -400 && mr3_time_left < 0) {
+        if(mr3_time_left > -400 && mr3_time_left <= 0) {
             if(s->timer_MCR & (1 << 9) && !(s->timer_IR & (1 << 3))) {
                 s->timer_IR |= (1 << 3);
                 interrupt_requested = true;
@@ -276,7 +276,7 @@ static void lpc4088_timer_set_alarm(LPC4088TimerState *s) {
         int64_t mr3_time_left;
         if(s->timer_MCR & (1 << 0) || s->timer_MCR & (1 << 1) || s->timer_MCR & (1 << 2)) {
             int64_t mr0_tc_left = (int64_t) s->timer_MR0 - (int64_t) s->timer_TC;
-            mr0_time_left = (mr0_tc_left / cycles_per_us) / (s->timer_PR + 1);
+            mr0_time_left = (mr0_tc_left * (s->timer_PR + 1) / cycles_per_us);
         } else {
             mr0_time_left = 0x7FFFFFFFFFFFFFFF;
         }
@@ -284,35 +284,51 @@ static void lpc4088_timer_set_alarm(LPC4088TimerState *s) {
 
         if(s->timer_MCR & (1 << 3) || s->timer_MCR & (1 << 4) || s->timer_MCR & (1 << 5)) {
             int64_t mr1_tc_left = (int64_t) s->timer_MR1 - (int64_t) s->timer_TC;
-            mr1_time_left = (mr1_tc_left / cycles_per_us) / (s->timer_PR + 1);
+            mr1_time_left = (mr1_tc_left * (s->timer_PR + 1) / cycles_per_us);
         } else {
             mr1_time_left = 0x7FFFFFFFFFFFFFFF;
         }
 
         if(s->timer_MCR & (1 << 6) || s->timer_MCR & (1 << 7) || s->timer_MCR & (1 << 8)) {
             int64_t mr2_tc_left = (int64_t) s->timer_MR2 - (int64_t) s->timer_TC;
-            mr2_time_left = (mr2_tc_left / cycles_per_us) / (s->timer_PR + 1);
+            mr2_time_left = (mr2_tc_left * (s->timer_PR + 1) / cycles_per_us);
         } else {
             mr2_time_left = 0x7FFFFFFFFFFFFFFF;
         }
 
         if(s->timer_MCR & (1 << 9) || s->timer_MCR & (1 << 10) || s->timer_MCR & (1 << 11)) {
             int64_t mr3_tc_left = (int64_t) s->timer_MR3 - (int64_t) s->timer_TC;
-            mr3_time_left = (mr3_tc_left / cycles_per_us) / (s->timer_PR + 1);
+            mr3_time_left = (mr3_tc_left * (s->timer_PR + 1) / cycles_per_us);
         } else {
             mr3_time_left = 0x7FFFFFFFFFFFFFFF;
         }
         
-        int64_t min_time_left = MAX(MIN(MIN(MIN(mr0_time_left, mr1_time_left), mr2_time_left), mr3_time_left), 0);
+        int64_t min_time_left = 0x7FFFFFFFFFFFFFFF;
+
+        if(mr0_time_left >= -200) {
+            min_time_left = MIN(min_time_left, mr0_time_left);
+        }
+        if(mr1_time_left >= -200) {
+            min_time_left = MIN(min_time_left, mr1_time_left);
+        }
+        if(mr2_time_left >= -200) {
+            min_time_left = MIN(min_time_left, mr2_time_left);
+        }
+        if(mr3_time_left >= -200) {
+            min_time_left = MIN(min_time_left, mr3_time_left);
+        }
+
         int64_t min_time_left_ns = min_time_left * 1000;
 
         DEBUG_PRINT("Min time left: %ld\n", min_time_left);
 
-        if(min_time_left_ns != 0) {
+        if(min_time_left_ns > 0) {
             if(timer_pending(s->timer)) {
                 timer_del(s->timer);
             }
             timer_mod(s->timer, now + min_time_left_ns);
+        } else if(min_time_left > -200 && min_time_left <= 0) {
+            lpc4088_timer_interrupt(s);
         }
     }
 }
@@ -420,8 +436,8 @@ static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, uns
         s->timer_IR &= ~value;
         return;
     case LPC4088_TIMER_REG_TCR:
-        s->timer_TCR = value;
         lpc4088_timer_update_tc(s);
+        s->timer_TCR = value;
         lpc4088_timer_set_alarm(s);	
         return;
     case LPC4088_TIMER_REG_TC:
