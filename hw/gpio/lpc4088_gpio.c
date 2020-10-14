@@ -17,7 +17,7 @@
 #include "trace.h"
 
 #ifndef DEBUG_LPC4088_GPIO
-#define DEBUG_LPC4088_GPIO 1
+#define DEBUG_LPC4088_GPIO 0
 #endif
 
 #define REMOTE_CTRL_GPIO_MAGIC 0xDEADBEE2
@@ -154,7 +154,8 @@ static void lpc4088_gpio_write(void *opaque, hwaddr offset, uint64_t value,
         s->mask = value;
         break;
     case PIN_ADDR:
-        s->pin = value & (~(s->mask)) & s->dir;
+        s->pin |= value & (~(s->mask)) & s->dir;
+        s->pin &= ~((~value) & (~(s->mask)) & s->dir);
         lpc4088_gpio_set_all_output_lines(s);
         break;
     case SET_ADDR:
