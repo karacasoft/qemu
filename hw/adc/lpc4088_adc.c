@@ -16,6 +16,8 @@
 #define REMOTE_CTRL_ADC_MAGIC 0xDEEDBEE5
 #define REMOTE_CTRL_CMD_ADC_DATA   0x21000100
 
+static const char *lpc4088_adc_register_name(uint32_t offset) __attribute__((unused));
+
 static const char *lpc4088_adc_register_name(uint32_t offset) {
 	switch (offset) {
     case LPC4088_ADC_REG_CR:
@@ -201,7 +203,19 @@ static void lpc4088_adc_reset(DeviceState *dev) {
 	s->tick_offset = lpc4088_ns_to_ticks(s, now);
 }
 
-static uint64_t lpc4088_adc_read(void *opaque, hwaddr offset, unsigned int size) {
+// FIXME: Please remove this function if it is actually unused
+static uint32_t lpc4088_adc_generate_value(LPC4088ADCState *s) __attribute__((unused));
+
+static uint32_t lpc4088_adc_generate_value(LPC4088ADCState *s)
+{
+    /* Attempts to fake some ADC values */
+    s->adc_DR0 = s->adc_DR0 + 7;
+
+    return s->adc_DR0;
+}
+
+static uint64_t lpc4088_adc_read(void *opaque, hwaddr offset, unsigned int size)
+{
     LPC4088ADCState *s = opaque;
 
     switch (offset) {

@@ -2,10 +2,14 @@
 #define __LPC4088_SC_H__
 
 #include "hw/sysbus.h"
+#include "qemu/timer.h"
+#include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_SC "lpc4088-sc"
 
 #define LPC4088SC(obj) OBJECT_CHECK(LPC4088SCState, (obj), TYPE_LPC4088_SC)
+
+#define LPC4088_SC_TIMER_FREQUENCY 0xF4240
 
 #define LPC4088_SC_MEM_SIZE 0x200
 
@@ -40,7 +44,7 @@
 #define LPC4088_SC_REG_RSID 0x180
 
 #define LPC4088_SC_REG_SCS 0x1A0
-#define LPC4088_SC_REG_IRCTRIM 0x1A4
+#define LPC4088_SC_REG_IRCCTRL 0x1A4
 #define LPC4088_SC_REG_PCLKSEL 0x1A8
 
 #define LPC4088_SC_REG_PBOOST 0x1B0
@@ -56,12 +60,31 @@
 #define LPC4088_SC_REG_EMCDLYCTL 0x1DC
 #define LPC4088_SC_REG_EMCCALd 0x1E0
 
+#define PLL_FEED_STATE_DEFAULT 0
+#define PLL_FEED_STATE_FEED1 1
+#define PLL_FEED_STATE_FEED2 2
+
+#define LPC4088_PCONP_GPIO_MASK (1 << 15)
+
 typedef struct LPC4088SCState {
     /* <private> */
     SysBusDevice parent_obj;
 
     /* <public> */
-    MemoryRegion mmio;
+    MemoryRegion iomem;
+	QEMUTimer *timer;
+	
+	uint8_t pll0_feed_state;
+	uint8_t pll1_feed_state;
+	
+	int64_t tick_offset;
+    uint64_t hit_time;
+    uint64_t freq_hz;
+	uint32_t SCPR;
+	
+	char *sc_name;
+    bool enable_rc;
+	uint32_t enableRemoteInterrupt;
 
 	uint32_t sc_FLASHCFG;
 	
@@ -93,7 +116,7 @@ typedef struct LPC4088SCState {
 	uint32_t sc_RSID;
 	
 	uint32_t sc_SCS;
-	uint32_t sc_IRCTRIM;
+	uint32_t sc_IRCCTRL;
 	uint32_t sc_PCLKSEL;
 	
 	uint32_t sc_PBOOST;
@@ -109,7 +132,30 @@ typedef struct LPC4088SCState {
 	uint32_t sc_EMCDLYCTL;
 	uint32_t sc_EMCCALd;
 	
-    qemu_irq irq;
+	uint32_t currentEXT0Value;
+	uint32_t currentEXT1Value;
+	uint32_t currentEXT2Value;
+	uint32_t currentEXT3Value;
+	
+	uint32_t previousEXT0Value;
+	uint32_t previousEXT1Value;
+	uint32_t previousEXT2Value;
+	uint32_t previousEXT3Value;
+	
+	uint32_t continueEXT0Interrrupt;
+	uint32_t continueEXT1Interrrupt;
+	uint32_t continueEXT2Interrrupt;
+	uint32_t continueEXT3Interrrupt;
+	
+	qemu_irq irq;
+	qemu_irq ext0_irq;
+	qemu_irq ext1_irq;
+	qemu_irq ext2_irq;
+	qemu_irq ext3_irq;
+	qemu_irq hard_fault_irq;
+	
+	RemoteCtrlState rcs;
+	
 } LPC4088SCState;
 
 #endif /* __LPC4088_SC_H__ */

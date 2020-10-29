@@ -15,6 +15,8 @@
 #include "hw/adc/lpc4088_adc.h"
 #include "hw/adc/lpc4088_dac.h"
 #include "hw/char/lpc4088_usart.h"
+#include "hw/misc/lpc4088_sc.h"
+#include "hw/misc/lpc4088_iocon.h"
 
 #define TYPE_LPC4088FET208 "lpc4088fet208"
 #define LPC4088FET208(obj) OBJECT_CHECK(LPC4088FET208State, (obj), TYPE_LPC4088FET208)
@@ -28,6 +30,7 @@
 #define LPC4088_NR_GPIO_PORTS 6
 #define LPC4088_GPIO_BASE_ADDR 0x20098000
 
+#define LPC4088_NR_SC_IRQ 4
 #define LPC4088_NR_TIMERS 4
 #define LPC4088_NR_PWMS 2
 #define LPC4088_NR_ADCS 1
@@ -42,12 +45,17 @@ typedef struct LPC4088FET208State {
     char *cpu_type;
     ARMv7MState armv7m;
 
+    LPC4088SCState syscon;
+    LPC4088IOCONState iocon;
+
     LPC4088GPIOPortState gpio[LPC4088_NR_GPIO_PORTS];
 	LPC4088TimerState timer[LPC4088_NR_TIMERS];
 	LPC4088PWMState pwm[LPC4088_NR_PWMS];
 	LPC4088ADCState adc[LPC4088_NR_ADCS];
 	LPC4088DACState dac[LPC4088_NR_DACS];
 	LPC4088USARTState usart[LPC4088_NR_USARTS];
+
+    qemu_irq hardfault_input_irq;
 
 } LPC4088FET208State;
 

@@ -3,13 +3,16 @@
 
 #include "hw/sysbus.h"
 #include "qemu/timer.h"
+#include "hw/misc/lpc4088_sc.h"
 #include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_TIMER "lpc4088-timer"
 
 #define LPC4088TIMER(obj) OBJECT_CHECK(LPC4088TimerState, (obj), TYPE_LPC4088_TIMER)
+#define LPC4088TIMER_GET_CLASS(obj) OBJECT_GET_CLASS(LPC4088TimerClass, (obj), TYPE_LPC4088_TIMER)
+#define LPC4088TIMER_CLASS(klass) OBJECT_CLASS_CHECK(LPC4088TimerClass, (klass), TYPE_LPC4088_TIMER)
 
-#define LPC4088_TIMER_FREQUENCY 0x3938700
+#define LPC4088_TIMER_FREQUENCY (60*1000*1000)
 
 #define LPC4088_TIMER_MEM_SIZE 0x080
 
@@ -29,8 +32,19 @@
 #define LPC4088_TIMER_REG_EMR 0x03C
 #define LPC4088_TIMER_REG_CTCR 0x070
 
+typedef struct LPC4088TimerState LPC4088TimerState;
 
-typedef struct LPC4088TimerState {
+typedef void (*TimerMatchEvent)(LPC4088TimerState *s);
+typedef void (*TimerSimulateCaptureEvent)(LPC4088TimerState *s, uint8_t capture_pin, uint8_t rising_edge);
+
+typedef struct LPC4088TimerClass {
+	DeviceClass parent;
+
+	TimerMatchEvent match_events[4];
+	TimerSimulateCaptureEvent simulate_capture;
+} LPC4088TimerClass;
+
+struct LPC4088TimerState {
     /* <private> */
     SysBusDevice parent_obj;
 
@@ -40,12 +54,12 @@ typedef struct LPC4088TimerState {
     qemu_irq irq;
 	
 	char *timer_name;
+	bool check_syscon;
     bool enable_rc;
-	uint32_t enableRemoteInterrupt;
-
-    int64_t tick_offset;
-    uint64_t hit_time;
+	
     uint64_t freq_hz;
+
+	int64_t tc_last_checked_at;
 	
 	uint32_t timer_IR;
 	uint32_t timer_TCR;
@@ -64,8 +78,13 @@ typedef struct LPC4088TimerState {
 	uint32_t timer_CTCR;
 	
 	RemoteCtrlState rcs;
+	LPC4088SCState *syscon;
 	
-} LPC4088TimerState;
+};
+
+
+void lpc4088_timer_do_match_event(LPC4088TimerState *s, int n);
+void lpc4088_timer_do_simulate_capture(LPC4088TimerState *s, uint8_t capture_pin, uint8_t rising_edge);
 
 
 #endif

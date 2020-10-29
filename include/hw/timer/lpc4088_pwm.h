@@ -3,13 +3,16 @@
 
 #include "hw/sysbus.h"
 #include "qemu/timer.h"
+#include "hw/timer/lpc4088_timer.h"
 #include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_PWM "lpc4088-pwm"
 
 #define LPC4088PWM(obj) OBJECT_CHECK(LPC4088PWMState, (obj), TYPE_LPC4088_PWM)
+#define LPC4088PWM_CLASS(klass) OBJECT_CLASS_CHECK(LPC4088PWMClass, (klass), TYPE_LPC4088_PWM)
+#define LPC4088PWM_GET_CLASS(obj) OBJECT_GET_CLASS(LPC4088PWMClass, (obj), TYPE_LPC4088_PWM)
 
-#define LPC4088_PWM_TIMER_FREQUENCY 0x3938700
+#define LPC4088_PWM_TIMER_FREQUENCY (60 * 1000 * 1000)
 
 #define LPC4088_PWM_MEM_SIZE 0x080
 
@@ -35,47 +38,38 @@
 #define LPC4088_PWM_REG_LER 0x050
 #define LPC4088_PWM_REG_CTCR 0x070
 
+typedef struct LPC4088PWMClass {
+	LPC4088TimerClass parent;
+
+	TimerMatchEvent parent_match_events[4];
+
+	DeviceRealize parent_realize;
+	DeviceReset parent_reset;
+} LPC4088PWMClass;
 
 typedef struct LPC4088PWMState {
     /* <private> */
-    SysBusDevice parent_obj;
+    LPC4088TimerState parent_obj;
 
     /* <public> */
+	const MemoryRegionOps *parent_mem_ops;
     MemoryRegion iomem;
-    QEMUTimer *timer;
-    qemu_irq irq;
+	bool enable_rc;
 	
 	char *pwm_name;
-    bool enable_rc;
-	uint32_t enableRemoteInterrupt;
-
-    int64_t tick_offset;
-    uint64_t hit_time;
-    uint64_t freq_hz;
+	uint64_t freq_hz;
 	
-	uint32_t pwm_IR;
-	uint32_t pwm_TCR;
-	uint32_t pwm_TC;
-	uint32_t pwm_PR;
-	uint32_t pwm_PC;
-	uint32_t pwm_MCR;
-	uint32_t pwm_MR0;
-	uint32_t pwm_MR1;
-	uint32_t pwm_MR2;
-	uint32_t pwm_MR3;
-	uint32_t pwm_CCR;
-	uint32_t pwm_CC0;
-	uint32_t pwm_CC1;
-	uint32_t pwm_CC2;
-	uint32_t pwm_CC3;
 	uint32_t pwm_MR4;
 	uint32_t pwm_MR5;
 	uint32_t pwm_MR6;
 	uint32_t pwm_PCR;
 	uint32_t pwm_LER;
-	uint32_t pwm_CTCR;
-	
-	RemoteCtrlState rcs;
+
+	// ## IMPORTANT
+	// The name is confusing but these registers are 
+	// **NOT** used as shadow registers. In fact, the other
+	// registers are used as shadow registers in PWM mode.
+	uint32_t pwm_shadow_mr[7];
 	
 } LPC4088PWMState;
 

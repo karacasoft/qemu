@@ -31,6 +31,11 @@
 #define LPC4088_USART_REG_RS485ADRMATCH 0x50
 #define LPC4088_USART_REG_RS485DLY 0x54
 
+
+// TODO check the real FIFO size
+#define LPC4088_USART_FIFO_SIZE 128
+
+
 typedef struct LPC4088USARTState {
     /* <private> */
     SysBusDevice parent_obj;
@@ -41,6 +46,15 @@ typedef struct LPC4088USARTState {
 	char *usart_name;
     bool enable_rc;
 	uint32_t enableRemoteInterrupt;
+
+	char fifo[LPC4088_USART_FIFO_SIZE];
+	char *fifo_write_ptr;
+	char *fifo_read_ptr;
+
+	bool rls_interrupt_active;
+	bool rda_interrupt_active;
+	bool cti_interrupt_active;
+	bool thre_interrupt_active;
 	
     uint32_t usart_RBR;
 	uint32_t usart_THR;
@@ -62,7 +76,6 @@ typedef struct LPC4088USARTState {
 	uint32_t usart_RS485ADRMATCH;
 	uint32_t usart_RS485DLY;
 
-    CharBackend chr;
     qemu_irq irq;
 	
 	RemoteCtrlState rcs;

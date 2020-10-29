@@ -4,6 +4,8 @@
 #include "qemu/log.h"
 #include "qemu/module.h"
 #include "hw/misc/lpc4088_iocon.h"
+#include "hw/qdev-core.h"
+#include "hw/qdev-properties.h"
 
 #ifndef LPC4088_IOCON_ERROR_DEBUG
 #define LPC4088_IOCON_ERROR_DEBUG 0
@@ -11,194 +13,200 @@
 
 #define DEBUG_PRINT(fmt, args...) if(LPC4088_IOCON_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_IOCON,__func__, ##args);}
 
+#define LPC4088_IOCON_RC_MAGIC_NUMBER 0x1EE7C0DE
+#define LPC4088_IOCON_RC_COMMAND_READ_PIN 0x10100
+
+static void lpc4088_iocon_send_status_of_pin(
+		LPC4088IOCONState *s, uint32_t port, uint32_t pin);
+
 static void lpc4088_iocon_reset(DeviceState *dev) {
-    LPC4088IOCONState *s = LPC4088IOCON(dev);
+    LPC4088IOCONState *s = LPC4088_IOCON(dev);
 	
-	s->iocon_P0_0 = 0x00000000;
-	s->iocon_P0_1 = 0x00000000;
-	s->iocon_P0_2 = 0x00000000;
-	s->iocon_P0_3 = 0x00000000;
-	s->iocon_P0_4 = 0x00000000;
-	s->iocon_P0_5 = 0x00000000;
-	s->iocon_P0_6 = 0x00000000;
-	s->iocon_P0_7 = 0x00000000;
+	s->iocon_P0_0 = 0x30;
+	s->iocon_P0_1 = 0x30;
+	s->iocon_P0_2 = 0x30;
+	s->iocon_P0_3 = 0x30;
+	s->iocon_P0_4 = 0x30;
+	s->iocon_P0_5 = 0x30;
+	s->iocon_P0_6 = 0x30;
+	s->iocon_P0_7 = 0xA0;
 
-	s->iocon_P0_8 = 0x00000000;				/* 0x020 */
-	s->iocon_P0_9 = 0x00000000;
-	s->iocon_P0_10 = 0x00000000;
-	s->iocon_P0_11 = 0x00000000;
-	s->iocon_P0_12 = 0x00000000;
-	s->iocon_P0_13 = 0x00000000;
-	s->iocon_P0_14 = 0x00000000;
-	s->iocon_P0_15 = 0x00000000;
+	s->iocon_P0_8 = 0xA0;				/* 0x020 */
+	s->iocon_P0_9 = 0xA0;
+	s->iocon_P0_10 = 0x30;
+	s->iocon_P0_11 = 0x30;
+	s->iocon_P0_12 = 0x1B0;
+	s->iocon_P0_13 = 0x1B0;
+	s->iocon_P0_14 = 0x30;
+	s->iocon_P0_15 = 0x30;
 
-	s->iocon_P0_16 = 0x00000000;				/* 0x040 */
-	s->iocon_P0_17 = 0x00000000;
-	s->iocon_P0_18 = 0x00000000;
-	s->iocon_P0_19 = 0x00000000;
-	s->iocon_P0_20 = 0x00000000;
-	s->iocon_P0_21 = 0x00000000;
-	s->iocon_P0_22 = 0x00000000;
-	s->iocon_P0_23 = 0x00000000;
+	s->iocon_P0_16 = 0x30;				/* 0x040 */
+	s->iocon_P0_17 = 0x30;
+	s->iocon_P0_18 = 0x30;
+	s->iocon_P0_19 = 0x30;
+	s->iocon_P0_20 = 0x30;
+	s->iocon_P0_21 = 0x30;
+	s->iocon_P0_22 = 0x30;
+	s->iocon_P0_23 = 0x1B0;
 
-	s->iocon_P0_24 = 0x00000000;				/* 0x060 */
-	s->iocon_P0_25 = 0x00000000;
-	s->iocon_P0_26 = 0x00000000;
+	s->iocon_P0_24 = 0x1B0;				/* 0x060 */
+	s->iocon_P0_25 = 0x1B0;
+	s->iocon_P0_26 = 0x1B0;
 	s->iocon_P0_27 = 0x00000000;
 	s->iocon_P0_28 = 0x00000000;
 	s->iocon_P0_29 = 0x00000000;
 	s->iocon_P0_30 = 0x00000000;
 	s->iocon_P0_31 = 0x00000000;
 
-	s->iocon_P1_0 = 0x00000000;				/* 0x080 */
-	s->iocon_P1_1 = 0x00000000;
-	s->iocon_P1_2 = 0x00000000;
-	s->iocon_P1_3 = 0x00000000;
-	s->iocon_P1_4 = 0x00000000;
-	s->iocon_P1_5 = 0x00000000;
-	s->iocon_P1_6 = 0x00000000;
-	s->iocon_P1_7 = 0x00000000;
+	s->iocon_P1_0 = 0x30;				/* 0x080 */
+	s->iocon_P1_1 = 0x30;
+	s->iocon_P1_2 = 0x30;
+	s->iocon_P1_3 = 0x30;
+	s->iocon_P1_4 = 0x30;
+	s->iocon_P1_5 = 0xB0;
+	s->iocon_P1_6 = 0xB0;
+	s->iocon_P1_7 = 0xB0;
 
-	s->iocon_P1_8 = 0x00000000;				/* 0x0A0 */
-	s->iocon_P1_9 = 0x00000000;
-	s->iocon_P1_10 = 0x00000000;
-	s->iocon_P1_11 = 0x00000000;
-	s->iocon_P1_12 = 0x00000000;
-	s->iocon_P1_13 = 0x00000000;
-	s->iocon_P1_14 = 0x00000000;
-	s->iocon_P1_15 = 0x00000000;
+	s->iocon_P1_8 = 0x30;				/* 0x0A0 */
+	s->iocon_P1_9 = 0x30;
+	s->iocon_P1_10 = 0x30;
+	s->iocon_P1_11 = 0x30;
+	s->iocon_P1_12 = 0x30;
+	s->iocon_P1_13 = 0x30;
+	s->iocon_P1_14 = 0xB0;
+	s->iocon_P1_15 = 0x30;
 
-	s->iocon_P1_16 = 0x00000000;				/* 0x0C0 */
-	s->iocon_P1_17 = 0x00000000;
-	s->iocon_P1_18 = 0x00000000;
-	s->iocon_P1_19 = 0x00000000;
-	s->iocon_P1_20 = 0x00000000;
-	s->iocon_P1_21 = 0x00000000;
-	s->iocon_P1_22 = 0x00000000;
-	s->iocon_P1_23 = 0x00000000;
+	s->iocon_P1_16 = 0xB0;				/* 0x0C0 */
+	s->iocon_P1_17 = 0xB0;
+	s->iocon_P1_18 = 0x30;
+	s->iocon_P1_19 = 0x30;
+	s->iocon_P1_20 = 0x30;
+	s->iocon_P1_21 = 0x30;
+	s->iocon_P1_22 = 0x30;
+	s->iocon_P1_23 = 0x30;
 
-	s->iocon_P1_24 = 0x00000000;				/* 0x0E0 */
-	s->iocon_P1_25 = 0x00000000;
-	s->iocon_P1_26 = 0x00000000;
-	s->iocon_P1_27 = 0x00000000;
-	s->iocon_P1_28 = 0x00000000;
-	s->iocon_P1_29 = 0x00000000;
-	s->iocon_P1_30 = 0x00000000;
-	s->iocon_P1_31 = 0x00000000;
+	s->iocon_P1_24 = 0x30;				/* 0x0E0 */
+	s->iocon_P1_25 = 0x30;
+	s->iocon_P1_26 = 0x30;
+	s->iocon_P1_27 = 0x30;
+	s->iocon_P1_28 = 0x30;
+	s->iocon_P1_29 = 0x30;
+	s->iocon_P1_30 = 0x1B0;
+	s->iocon_P1_31 = 0x1B0;
 
-	s->iocon_P2_0 = 0x00000000;				/* 0x100 */
-	s->iocon_P2_1 = 0x00000000;
-	s->iocon_P2_2 = 0x00000000;
-	s->iocon_P2_3 = 0x00000000;
-	s->iocon_P2_4 = 0x00000000;
-	s->iocon_P2_5 = 0x00000000;
-	s->iocon_P2_6 = 0x00000000;
-	s->iocon_P2_7 = 0x00000000;
+	s->iocon_P2_0 = 0x30;				/* 0x100 */
+	s->iocon_P2_1 = 0x30;
+	s->iocon_P2_2 = 0x30;
+	s->iocon_P2_3 = 0x30;
+	s->iocon_P2_4 = 0x30;
+	s->iocon_P2_5 = 0x30;
+	s->iocon_P2_6 = 0x30;
+	s->iocon_P2_7 = 0x30;
 
-	s->iocon_P2_8 = 0x00000000;				/* 0x120 */
-	s->iocon_P2_9 = 0x00000000;
-	s->iocon_P2_10 = 0x00000000;
-	s->iocon_P2_11 = 0x00000000;
-	s->iocon_P2_12 = 0x00000000;
-	s->iocon_P2_13 = 0x00000000;
-	s->iocon_P2_14 = 0x00000000;
-	s->iocon_P2_15 = 0x00000000;
+	s->iocon_P2_8 = 0x30;				/* 0x120 */
+	s->iocon_P2_9 = 0x30;
+	s->iocon_P2_10 = 0x30;
+	s->iocon_P2_11 = 0x30;
+	s->iocon_P2_12 = 0x30;
+	s->iocon_P2_13 = 0x30;
+	s->iocon_P2_14 = 0x30;
+	s->iocon_P2_15 = 0x30;
 
-	s->iocon_P2_16 = 0x00000000;				/* 0x140 */
-	s->iocon_P2_17 = 0x00000000;
-	s->iocon_P2_18 = 0x00000000;
-	s->iocon_P2_19 = 0x00000000;
-	s->iocon_P2_20 = 0x00000000;
-	s->iocon_P2_21 = 0x00000000;
-	s->iocon_P2_22 = 0x00000000;
-	s->iocon_P2_23 = 0x00000000;
+	s->iocon_P2_16 = 0x30;				/* 0x140 */
+	s->iocon_P2_17 = 0x30;
+	s->iocon_P2_18 = 0x30;
+	s->iocon_P2_19 = 0x30;
+	s->iocon_P2_20 = 0x30;
+	s->iocon_P2_21 = 0x30;
+	s->iocon_P2_22 = 0x30;
+	s->iocon_P2_23 = 0x30;
 
-	s->iocon_P2_24 = 0x00000000;				/* 0x160 */
-	s->iocon_P2_25 = 0x00000000;
-	s->iocon_P2_26 = 0x00000000;
-	s->iocon_P2_27 = 0x00000000;
-	s->iocon_P2_28 = 0x00000000;
-	s->iocon_P2_29 = 0x00000000;
-	s->iocon_P2_30 = 0x00000000;
-	s->iocon_P2_31 = 0x00000000;
+	s->iocon_P2_24 = 0x30;				/* 0x160 */
+	s->iocon_P2_25 = 0x30;
+	s->iocon_P2_26 = 0x30;
+	s->iocon_P2_27 = 0x30;
+	s->iocon_P2_28 = 0x30;
+	s->iocon_P2_29 = 0x30;
+	s->iocon_P2_30 = 0x30;
+	s->iocon_P2_31 = 0x30;
 
-	s->iocon_P3_0 = 0x00000000;				/* 0x180 */
-	s->iocon_P3_1 = 0x00000000;
-	s->iocon_P3_2 = 0x00000000;
-	s->iocon_P3_3 = 0x00000000;
-	s->iocon_P3_4 = 0x00000000;
-	s->iocon_P3_5 = 0x00000000;
-	s->iocon_P3_6 = 0x00000000;
-	s->iocon_P3_7 = 0x00000000;
+	s->iocon_P3_0 = 0x30;				/* 0x180 */
+	s->iocon_P3_1 = 0x30;
+	s->iocon_P3_2 = 0x30;
+	s->iocon_P3_3 = 0x30;
+	s->iocon_P3_4 = 0x30;
+	s->iocon_P3_5 = 0x30;
+	s->iocon_P3_6 = 0x30;
+	s->iocon_P3_7 = 0x30;
 
-	s->iocon_P3_8 = 0x00000000;				/* 0x1A0 */
-	s->iocon_P3_9 = 0x00000000;
-	s->iocon_P3_10 = 0x00000000;
-	s->iocon_P3_11 = 0x00000000;
-	s->iocon_P3_12 = 0x00000000;
-	s->iocon_P3_13 = 0x00000000;
-	s->iocon_P3_14 = 0x00000000;
-	s->iocon_P3_15 = 0x00000000;
+	s->iocon_P3_8 = 0x30;				/* 0x1A0 */
+	s->iocon_P3_9 = 0x30;
+	s->iocon_P3_10 = 0x30;
+	s->iocon_P3_11 = 0x30;
+	s->iocon_P3_12 = 0x30;
+	s->iocon_P3_13 = 0x30;
+	s->iocon_P3_14 = 0x30;
+	s->iocon_P3_15 = 0x30;
 
-	s->iocon_P3_16 = 0x00000000;				/* 0x1C0 */
-	s->iocon_P3_17 = 0x00000000;
-	s->iocon_P3_18 = 0x00000000;
-	s->iocon_P3_19 = 0x00000000;
-	s->iocon_P3_20 = 0x00000000;
-	s->iocon_P3_21 = 0x00000000;
-	s->iocon_P3_22 = 0x00000000;
-	s->iocon_P3_23 = 0x00000000;
+	s->iocon_P3_16 = 0x30;				/* 0x1C0 */
+	s->iocon_P3_17 = 0x30;
+	s->iocon_P3_18 = 0x30;
+	s->iocon_P3_19 = 0x30;
+	s->iocon_P3_20 = 0x30;
+	s->iocon_P3_21 = 0x30;
+	s->iocon_P3_22 = 0x30;
+	s->iocon_P3_23 = 0x30;
 
-	s->iocon_P3_24 = 0x00000000;				/* 0x1E0 */
-	s->iocon_P3_25 = 0x00000000;
-	s->iocon_P3_26 = 0x00000000;
-	s->iocon_P3_27 = 0x00000000;
-	s->iocon_P3_28 = 0x00000000;
-	s->iocon_P3_29 = 0x00000000;
-	s->iocon_P3_30 = 0x00000000;
-	s->iocon_P3_31 = 0x00000000;
+	s->iocon_P3_24 = 0x30;				/* 0x1E0 */
+	s->iocon_P3_25 = 0x30;
+	s->iocon_P3_26 = 0x30;
+	s->iocon_P3_27 = 0x30;
+	s->iocon_P3_28 = 0x30;
+	s->iocon_P3_29 = 0x30;
+	s->iocon_P3_30 = 0x30;
+	s->iocon_P3_31 = 0x30;
 
-	s->iocon_P4_0 = 0x00000000;				/* 0x200 */
-	s->iocon_P4_1 = 0x00000000;
-	s->iocon_P4_2 = 0x00000000;
-	s->iocon_P4_3 = 0x00000000;
-	s->iocon_P4_4 = 0x00000000;
-	s->iocon_P4_5 = 0x00000000;
-	s->iocon_P4_6 = 0x00000000;
-	s->iocon_P4_7 = 0x00000000;
+	s->iocon_P4_0 = 0x30;				/* 0x200 */
+	s->iocon_P4_1 = 0x30;
+	s->iocon_P4_2 = 0x30;
+	s->iocon_P4_3 = 0x30;
+	s->iocon_P4_4 = 0x30;
+	s->iocon_P4_5 = 0x30;
+	s->iocon_P4_6 = 0x30;
+	s->iocon_P4_7 = 0x30;
 
-	s->iocon_P4_8 = 0x00000000;				/* 0x220 */
-	s->iocon_P4_9 = 0x00000000;
-	s->iocon_P4_10 = 0x00000000;
-	s->iocon_P4_11 = 0x00000000;
-	s->iocon_P4_12 = 0x00000000;
-	s->iocon_P4_13 = 0x00000000;
-	s->iocon_P4_14 = 0x00000000;
-	s->iocon_P4_15 = 0x00000000;
+	s->iocon_P4_8 = 0x30;				/* 0x220 */
+	s->iocon_P4_9 = 0x30;
+	s->iocon_P4_10 = 0x30;
+	s->iocon_P4_11 = 0x30;
+	s->iocon_P4_12 = 0x30;
+	s->iocon_P4_13 = 0x30;
+	s->iocon_P4_14 = 0x30;
+	s->iocon_P4_15 = 0x30;
 
-	s->iocon_P4_16 = 0x00000000;				/* 0x240 */
-	s->iocon_P4_17 = 0x00000000;
-	s->iocon_P4_18 = 0x00000000;
-	s->iocon_P4_19 = 0x00000000;
-	s->iocon_P4_20 = 0x00000000;
-	s->iocon_P4_21 = 0x00000000;
-	s->iocon_P4_22 = 0x00000000;
-	s->iocon_P4_23 = 0x00000000;
+	s->iocon_P4_16 = 0x30;				/* 0x240 */
+	s->iocon_P4_17 = 0x30;
+	s->iocon_P4_18 = 0x30;
+	s->iocon_P4_19 = 0x30;
+	s->iocon_P4_20 = 0x30;
+	s->iocon_P4_21 = 0x30;
+	s->iocon_P4_22 = 0x30;
+	s->iocon_P4_23 = 0x30;
 
-	s->iocon_P4_24 = 0x00000000;				/* 0x260 */
-	s->iocon_P4_25 = 0x00000000;
-	s->iocon_P4_26 = 0x00000000;
-	s->iocon_P4_27 = 0x00000000;
-	s->iocon_P4_28 = 0x00000000;
-	s->iocon_P4_29 = 0x00000000;
-	s->iocon_P4_30 = 0x00000000;
-	s->iocon_P4_31 = 0x00000000;
+	s->iocon_P4_24 = 0x30;				/* 0x260 */
+	s->iocon_P4_25 = 0x30;
+	s->iocon_P4_26 = 0x30;
+	s->iocon_P4_27 = 0x30;
+	s->iocon_P4_28 = 0x30;
+	s->iocon_P4_29 = 0x30;
+	s->iocon_P4_30 = 0x30;
+	s->iocon_P4_31 = 0x30;
 
-	s->iocon_P5_0 = 0x00000000;				/* 0x280 */
-	s->iocon_P5_1 = 0x00000000;
+	s->iocon_P5_0 = 0x30;				/* 0x280 */
+	s->iocon_P5_1 = 0x30;
 	s->iocon_P5_2 = 0x00000000;
 	s->iocon_P5_3 = 0x00000000;
-	s->iocon_P5_4 = 0x00000000;				/* 0x290 */
+	s->iocon_P5_4 = 0x30;				/* 0x290 */
 }
 
 static uint64_t lpc4088_iocon_read(void *opaque, hwaddr addr, unsigned int size) {
@@ -547,6 +555,7 @@ static void lpc4088_iocon_write(void *opaque, hwaddr addr, uint64_t val64, unsig
     uint32_t value = (uint32_t) val64;
 			 
 	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","IOCON_Write",(uint32_t) value);
+
 
     switch (addr) {
     case LPC4088_IOCON_REG_P0_0:
@@ -1047,6 +1056,10 @@ static void lpc4088_iocon_write(void *opaque, hwaddr addr, uint64_t val64, unsig
     default:
         qemu_log_mask(LOG_GUEST_ERROR,"%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, addr);
     }
+
+	uint32_t port = (addr / 0x80) + '0';
+	uint32_t pin = (addr % 0x80) / 4;
+	lpc4088_iocon_send_status_of_pin(s, port, pin);
 }
 
 static const MemoryRegionOps lpc4088_iocon_ops = {
@@ -1251,10 +1264,51 @@ static const VMStateDescription vmstate_lpc4088_iocon = {
     }
 };
 
-static void lpc4088_iocon_init(Object *obj) {
-    LPC4088IOCONState *s = LPC4088IOCON(obj);
+static void lpc4088_iocon_send_status_of_pin(
+		LPC4088IOCONState *s, uint32_t port, uint32_t pin) {
+	RemoteCtrlClass *rcc = REMOTE_CTRL_GET_CLASS(&s->rcs);
 
-    sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
+	hwaddr offset = (port - '0') * 0x80 + (pin) * 4;
+
+	uint32_t reg_val = (uint32_t) lpc4088_iocon_read((void *)s, offset, 4);
+
+
+	RemoteCtrlMessage msg = {
+		.magic = LPC4088_IOCON_RC_MAGIC_NUMBER,
+		.cmd = 0,
+		.arg1 = port,
+		.arg2 = pin,
+		.arg3 = reg_val,
+		.arg4 = 0,
+		.arg5 = 0,
+		.arg6 = 0
+	};
+
+	rcc->send_message(&s->rcs, &msg, sizeof(RemoteCtrlMessage));
+}
+
+static void lpc4088_iocon_remote_ctrl_callback(RemoteCtrlState *rcs, RemoteCtrlMessage *data) {
+	LPC4088IOCONState *s = LPC4088_IOCON(rcs->connected_device);
+
+	if(data->cmd == LPC4088_IOCON_RC_COMMAND_READ_PIN) {
+		lpc4088_iocon_send_status_of_pin(
+			s, data->arg1, data->arg2
+		);
+	}
+}
+
+static void lpc4088_iocon_realize(DeviceState *dev, Error **errp) {
+	LPC4088IOCONState *s = LPC4088_IOCON(dev);
+
+	s->rcs.connected_device = dev;
+	s->rcs.callback = lpc4088_iocon_remote_ctrl_callback;
+	qdev_realize(DEVICE(&s->rcs), NULL, NULL);
+}
+
+static void lpc4088_iocon_init(Object *obj) {
+    LPC4088IOCONState *s = LPC4088_IOCON(obj);
+
+	object_initialize_child(obj, "iocon-rcs", &s->rcs, TYPE_REMOTE_CTRL);
 
     memory_region_init_io(&s->mmio, obj, &lpc4088_iocon_ops, s,TYPE_LPC4088_IOCON, LPC4088_IOCON_MEM_SIZE);
     sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);
@@ -1265,6 +1319,7 @@ static void lpc4088_iocon_class_init(ObjectClass *klass, void *data) {
 
     dc->reset = lpc4088_iocon_reset;
     dc->vmsd = &vmstate_lpc4088_iocon;
+	dc->realize = lpc4088_iocon_realize;
 }
 
 static const TypeInfo lpc4088_iocon_info = {

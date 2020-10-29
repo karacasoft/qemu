@@ -2,10 +2,13 @@
 #define __LPC4088_IOCON_H__
 
 #include "hw/sysbus.h"
+#include "hw/remotectrl/remotectrl.h"
 
 #define TYPE_LPC4088_IOCON "lpc4088-iocon"
 
-#define LPC4088IOCON(obj) OBJECT_CHECK(LPC4088IOCONState, (obj), TYPE_LPC4088_IOCON)
+#define LPC4088_IOCON(obj) OBJECT_CHECK(LPC4088IOCONState, (obj), TYPE_LPC4088_IOCON)
+
+#define LPC4088_IOCON_BASE_ADDR 0x4002C000
 
 #define LPC4088_IOCON_MEM_SIZE 0x300
 
@@ -368,7 +371,8 @@ typedef struct LPC4088IOCONState {
 	uint32_t iocon_P5_3;
 	uint32_t iocon_P5_4;				/* 0x290 */
 
-    qemu_irq irq;
+	RemoteCtrlState rcs;
+
 } LPC4088IOCONState;
 
 #endif /* __LPC4088_IOCON_H__ */
