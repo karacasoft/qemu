@@ -701,7 +701,6 @@ static void lpc4088_sc_class_init(ObjectClass *klass, void *data) {
 
 	dc->realize = lpc4088_sc_realize;
     dc->reset = lpc4088_sc_reset;
-	device_class_set_props(dc, lpc4088_sc_properties);
     dc->vmsd = &vmstate_lpc4088_sc;
 	dc->realize = lpc4088_sc_realize;
 }
