@@ -166,6 +166,23 @@ static void lpc4088_usart_reset(DeviceState *dev) {
 	s->enableRemoteInterrupt = 0;
 }
 
+static void lpc4088_usart_send_reg_change(LPC4088USARTState *s, uint32_t reg_offset, uint32_t val) {
+    RemoteCtrlClass *rcc = REMOTE_CTRL_GET_CLASS(&s->rcs);
+    
+    RemoteCtrlMessage msg = {
+        .magic = REMOTE_CTRL_USART_MAGIC,
+        .cmd = 1,
+        .arg1 = s->usart_name[0],
+        .arg2 = reg_offset,
+        .arg3 = val,
+        .arg4 = 0,
+        .arg5 = 0,
+        .arg6 = 0
+    };
+
+    rcc->send_message(&s->rcs, &msg, sizeof(RemoteCtrlMessage));
+}
+
 static uint64_t lpc4088_usart_read(void *opaque, hwaddr offset, unsigned int size) {
     LPC4088USARTState *s = opaque;
     uint64_t retvalue;
@@ -234,6 +251,7 @@ static void lpc4088_usart_write(void *opaque, hwaddr offset, uint64_t val64, uns
     case LPC4088_USART_REG_THR:
         if(s->usart_LCR & (1 << 7)) {
             s->usart_DLL = value;
+            lpc4088_usart_send_reg_change(s, offset, value);
         } else {
             char ch = value & 0xFF;
             lpc4088_usart_send(s, ch);
@@ -245,6 +263,7 @@ static void lpc4088_usart_write(void *opaque, hwaddr offset, uint64_t val64, uns
 	case LPC4088_USART_REG_DLM:
         if(s->usart_LCR & (1 << 7)) {
             s->usart_DLM = value;
+            lpc4088_usart_send_reg_change(s, offset, value);
         } else {
             s->usart_IER = value;
         }
@@ -257,24 +276,30 @@ static void lpc4088_usart_write(void *opaque, hwaddr offset, uint64_t val64, uns
         } else {
             s->usart_IIR &= ~(3 << 6);
         }
+        lpc4088_usart_send_reg_change(s, offset, value);
         return;
 	case LPC4088_USART_REG_LCR:
         s->usart_LCR = value;
+        lpc4088_usart_send_reg_change(s, offset, value);
         return;
 	case LPC4088_USART_REG_LSR:
         // Read only
         return;
 	case LPC4088_USART_REG_SCR:
         s->usart_SCR = value;
+        lpc4088_usart_send_reg_change(s, offset, value);
         return;
 	case LPC4088_USART_REG_ACR:
         s->usart_ACR = value;
+        lpc4088_usart_send_reg_change(s, offset, value);
         return;
 	case LPC4088_USART_REG_FDR:
         s->usart_FDR = value;
+        lpc4088_usart_send_reg_change(s, offset, value);
         return;
 	case LPC4088_USART_REG_TER:
         s->usart_TER = value;
+        lpc4088_usart_send_reg_change(s, offset, value);
         return;
 	case LPC4088_USART_REG_RS485CTRL:
         s->usart_RS485CTRL = value;

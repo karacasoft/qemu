@@ -9,7 +9,7 @@
 #include "qemu/main-loop.h"
 
 #ifndef LPC4088_TIMER_ERROR_DEBUG
-#define LPC4088_TIMER_ERROR_DEBUG 1
+#define LPC4088_TIMER_ERROR_DEBUG 0
 #endif
 
 #define DEBUG_PRINT(fmt, args...) if(LPC4088_TIMER_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_TIMER,__func__, ##args);}
@@ -83,6 +83,25 @@ void lpc4088_timer_do_match_event(LPC4088TimerState *s, int n) {
     tc->match_events[n](s);
 }
 
+static void lpc4088_timer_send_emr_change(LPC4088TimerState *s, uint32_t val) {
+    if(s->enable_rc) {
+        RemoteCtrlClass *rcc = REMOTE_CTRL_GET_CLASS(&s->rcs);
+
+        RemoteCtrlMessage msg = {
+            .magic = REMOTE_CTRL_TIMER_MAGIC,
+            .cmd = 1,
+            .arg1 = s->timer_name[0],
+            .arg2 = val,
+            .arg3 = 0,
+            .arg4 = 0,
+            .arg5 = 0,
+            .arg6 = 0
+        };
+
+        rcc->send_message(&s->rcs, (void *)&msg, sizeof(RemoteCtrlMessage));
+    }
+}
+
 static void lpc4088_timer_match_event0(LPC4088TimerState *s) {
     // set external match register bit in the event of MR0
     uint32_t emr_mr0 = (s->timer_EMR >> 4) & 3;
@@ -137,7 +156,6 @@ static void lpc4088_timer_match_event3(LPC4088TimerState *s) {
 
 static void lpc4088_timer_interrupt(void *opaque) {
     LPC4088TimerState *s = opaque;
-    int64_t cycles_per_us = s->freq_hz / 1000000;
 
     lpc4088_timer_update_tc(s);
 
@@ -145,99 +163,97 @@ static void lpc4088_timer_interrupt(void *opaque) {
     bool reset_requested = false;
     bool stop_requested = false;
     
-    int64_t mr0_time_left;
-    int64_t mr1_time_left;
-    int64_t mr2_time_left;
-    int64_t mr3_time_left;
-    if(s->timer_MCR & (7 << 0)) {
+    if(s->next_match_interrupt == 0 && s->timer_MCR & (7 << 0)) {
         // check if we have an MR0 event here by checking the remaining time
         int64_t mr0_tc_left = (int64_t) s->timer_MR0 - (int64_t) s->timer_TC;
-        mr0_time_left = (mr0_tc_left / cycles_per_us) / (s->timer_PR + 1);
 
-        // There is some inconsistency between time measurements so we
-        // use a threshold to determine if we have hit the MATCH register
-        if(mr0_time_left > -400 && mr0_time_left <= 0) {
-            
-            if(s->timer_MCR & (1 << 0) && !(s->timer_IR & (1 << 0))) {
-                s->timer_IR |= (1 << 0);
-                interrupt_requested = true;
-            }
-            if(s->timer_MCR & (1 << 1)) {
-                reset_requested = true;
-            }
-            if(s->timer_MCR & (1 << 2)) {
-                stop_requested = true;
-            }
-
-            lpc4088_timer_do_match_event(s, 0);
+        if(mr0_tc_left < 0) {
+            // we're lagging behind. Make the counter catch up
+            s->timer_TC = s->timer_MR0;
+        }
+        if(s->timer_MCR & (1 << 0) && !(s->timer_IR & (1 << 0))) {
+            s->timer_IR |= (1 << 0);
+            interrupt_requested = true;
+        }
+        if(s->timer_MCR & (1 << 1)) {
+            reset_requested = true;
+        }
+        if(s->timer_MCR & (1 << 2)) {
+            stop_requested = true;
         }
 
-        
+        lpc4088_timer_do_match_event(s, 0);
     }
 
-    if(s->timer_MCR & (7 << 3)) {
+    if(s->next_match_interrupt == 1 && s->timer_MCR & (7 << 3)) {
         // check if we have an MR1 event here by checking the remaining time
         int64_t mr1_tc_left = (int64_t) s->timer_MR1 - (int64_t) s->timer_TC;
-        mr1_time_left = (mr1_tc_left / cycles_per_us) / (s->timer_PR + 1);
+
+        if(mr1_tc_left < 0) {
+            // we're lagging behind. Make the counter catch up
+            s->timer_TC = s->timer_MR1;
+        }
 
         // TODO we probably could have used an array to simulate
         // match registers and iterate over them using a loop
-        if(mr1_time_left > -400 && mr1_time_left <= 0) {
-            if(s->timer_MCR & (1 << 3) && !(s->timer_IR & (1 << 1))) {
-                s->timer_IR |= (1 << 1);
-                interrupt_requested = true;
-            }
-            if(s->timer_MCR & (1 << 4)) {
-                reset_requested = true;
-            }
-            if(s->timer_MCR & (1 << 5)) {
-                stop_requested = true;
-            }
-
-            lpc4088_timer_do_match_event(s, 1);
+        if(s->timer_MCR & (1 << 3) && !(s->timer_IR & (1 << 1))) {
+            s->timer_IR |= (1 << 1);
+            interrupt_requested = true;
         }
+        if(s->timer_MCR & (1 << 4)) {
+            reset_requested = true;
+        }
+        if(s->timer_MCR & (1 << 5)) {
+            stop_requested = true;
+        }
+
+        lpc4088_timer_do_match_event(s, 1);
     }
 
-    if(s->timer_MCR & (7 << 6)) {
+    if(s->next_match_interrupt == 2 && s->timer_MCR & (7 << 6)) {
         // check if we have an MR2 event here by checking the remaining time
         int64_t mr2_tc_left = (int64_t) s->timer_MR2 - (int64_t) s->timer_TC;
-        mr2_time_left = (mr2_tc_left / cycles_per_us) / (s->timer_PR + 1);
 
-        if(mr2_time_left > -400 && mr2_time_left <= 0) {
-            if(s->timer_MCR & (1 << 6) && !(s->timer_IR & (1 << 2))) {
-                s->timer_IR |= (1 << 2);
-                interrupt_requested = true;
-            }
-            if(s->timer_MCR & (1 << 7)) {
-                reset_requested = true;
-            }
-            if(s->timer_MCR & (1 << 8)) {
-                stop_requested = true;
-            }
-
-            lpc4088_timer_do_match_event(s, 2);
+        if(mr2_tc_left < 0) {
+            // we're lagging behind. Make the counter catch up
+            s->timer_TC = s->timer_MR2;
         }
+
+        if(s->timer_MCR & (1 << 6) && !(s->timer_IR & (1 << 2))) {
+            s->timer_IR |= (1 << 2);
+            interrupt_requested = true;
+        }
+        if(s->timer_MCR & (1 << 7)) {
+            reset_requested = true;
+        }
+        if(s->timer_MCR & (1 << 8)) {
+            stop_requested = true;
+        }
+
+        lpc4088_timer_do_match_event(s, 2);
     }
 
-    if(s->timer_MCR & (7 << 9)) {
+    if(s->next_match_interrupt == 3 && s->timer_MCR & (7 << 9)) {
         // check if we have an MR2 event here by checking the remaining time
         int64_t mr3_tc_left = (int64_t) s->timer_MR3 - (int64_t) s->timer_TC;
-        mr3_time_left = (mr3_tc_left / cycles_per_us) / (s->timer_PR + 1);
 
-        if(mr3_time_left > -400 && mr3_time_left <= 0) {
-            if(s->timer_MCR & (1 << 9) && !(s->timer_IR & (1 << 3))) {
-                s->timer_IR |= (1 << 3);
-                interrupt_requested = true;
-            }
-            if(s->timer_MCR & (1 << 10)) {
-                reset_requested = true;
-            }
-            if(s->timer_MCR & (1 << 11)) {
-                stop_requested = true;
-            }
-
-            lpc4088_timer_do_match_event(s, 3);
+        if(mr3_tc_left < 0) {
+            // we're lagging behind. Make the counter catch up
+            s->timer_TC = s->timer_MR3;
         }
+
+        if(s->timer_MCR & (1 << 9) && !(s->timer_IR & (1 << 3))) {
+            s->timer_IR |= (1 << 3);
+            interrupt_requested = true;
+        }
+        if(s->timer_MCR & (1 << 10)) {
+            reset_requested = true;
+        }
+        if(s->timer_MCR & (1 << 11)) {
+            stop_requested = true;
+        }
+
+        lpc4088_timer_do_match_event(s, 3);
     }
     
     if(interrupt_requested) {
@@ -255,6 +271,9 @@ static void lpc4088_timer_interrupt(void *opaque) {
         s->timer_TCR = 0;
         s->tc_last_checked_at = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
     }
+
+    DEBUG_PRINT("(%s, EMR = 0x%" PRIx32 ")\n","Timer_Interrupt", (uint32_t) s->timer_EMR);
+    lpc4088_timer_send_emr_change(s, s->timer_EMR);
     
     DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n","Timer_Interrupt", (uint32_t) s->timer_IR);
     
@@ -274,61 +293,66 @@ static void lpc4088_timer_set_alarm(LPC4088TimerState *s) {
         int64_t mr1_time_left;
         int64_t mr2_time_left;
         int64_t mr3_time_left;
-        if(s->timer_MCR & (1 << 0) || s->timer_MCR & (1 << 1) || s->timer_MCR & (1 << 2)) {
-            int64_t mr0_tc_left = (int64_t) s->timer_MR0 - (int64_t) s->timer_TC;
-            mr0_time_left = (mr0_tc_left * (s->timer_PR + 1) / cycles_per_us);
+        if(s->next_match_interrupt != 0 && (s->timer_MCR & (1 << 0) || s->timer_MCR & (1 << 1) || s->timer_MCR & (1 << 2))) {
+            mr0_time_left = (int64_t) s->timer_MR0 - (int64_t) s->timer_TC;
         } else {
             mr0_time_left = 0x7FFFFFFFFFFFFFFF;
         }
         
 
-        if(s->timer_MCR & (1 << 3) || s->timer_MCR & (1 << 4) || s->timer_MCR & (1 << 5)) {
-            int64_t mr1_tc_left = (int64_t) s->timer_MR1 - (int64_t) s->timer_TC;
-            mr1_time_left = (mr1_tc_left * (s->timer_PR + 1) / cycles_per_us);
+        if(s->next_match_interrupt != 1 && (s->timer_MCR & (1 << 3) || s->timer_MCR & (1 << 4) || s->timer_MCR & (1 << 5))) {
+            mr1_time_left = (int64_t) s->timer_MR1 - (int64_t) s->timer_TC;
         } else {
             mr1_time_left = 0x7FFFFFFFFFFFFFFF;
         }
 
-        if(s->timer_MCR & (1 << 6) || s->timer_MCR & (1 << 7) || s->timer_MCR & (1 << 8)) {
-            int64_t mr2_tc_left = (int64_t) s->timer_MR2 - (int64_t) s->timer_TC;
-            mr2_time_left = (mr2_tc_left * (s->timer_PR + 1) / cycles_per_us);
+        if(s->next_match_interrupt != 2 && (s->timer_MCR & (1 << 6) || s->timer_MCR & (1 << 7) || s->timer_MCR & (1 << 8))) {
+            mr2_time_left = (int64_t) s->timer_MR2 - (int64_t) s->timer_TC;
         } else {
             mr2_time_left = 0x7FFFFFFFFFFFFFFF;
         }
 
-        if(s->timer_MCR & (1 << 9) || s->timer_MCR & (1 << 10) || s->timer_MCR & (1 << 11)) {
-            int64_t mr3_tc_left = (int64_t) s->timer_MR3 - (int64_t) s->timer_TC;
-            mr3_time_left = (mr3_tc_left * (s->timer_PR + 1) / cycles_per_us);
+        if(s->next_match_interrupt != 3 && (s->timer_MCR & (1 << 9) || s->timer_MCR & (1 << 10) || s->timer_MCR & (1 << 11))) {
+            mr3_time_left = (int64_t) s->timer_MR3 - (int64_t) s->timer_TC;
         } else {
             mr3_time_left = 0x7FFFFFFFFFFFFFFF;
         }
         
         int64_t min_time_left = 0x7FFFFFFFFFFFFFFF;
+        uint8_t selected_mr = -1;
 
-        if(mr0_time_left >= -200) {
-            min_time_left = MIN(min_time_left, mr0_time_left);
+        if(mr0_time_left < min_time_left) {
+            min_time_left = mr0_time_left;
+            selected_mr = 0;
         }
-        if(mr1_time_left >= -200) {
-            min_time_left = MIN(min_time_left, mr1_time_left);
+        if(mr1_time_left < min_time_left) {
+            min_time_left = mr1_time_left;
+            selected_mr = 1;
         }
-        if(mr2_time_left >= -200) {
-            min_time_left = MIN(min_time_left, mr2_time_left);
+        if(mr2_time_left < min_time_left) {
+            min_time_left = mr2_time_left;
+            selected_mr = 2;
         }
-        if(mr3_time_left >= -200) {
-            min_time_left = MIN(min_time_left, mr3_time_left);
+        if(mr3_time_left < min_time_left) {
+            min_time_left = mr3_time_left;
+            selected_mr = 3;
         }
-
-        int64_t min_time_left_ns = min_time_left * 1000;
+        s->next_match_interrupt = selected_mr;
 
         DEBUG_PRINT("Min time left: %ld\n", min_time_left);
-
-        if(min_time_left_ns > 0) {
-            if(timer_pending(s->timer)) {
-                timer_del(s->timer);
+        if(min_time_left != 0x7FFFFFFFFFFFFFFF) {
+            if(min_time_left <= 0) {
+                s->tc_last_checked_at = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+                s->timer_TC += (min_time_left - 10);
+                min_time_left = 10;
             }
-            timer_mod(s->timer, now + min_time_left_ns);
-        } else if(min_time_left > -200 && min_time_left <= 0) {
-            lpc4088_timer_interrupt(s);
+            if(min_time_left > 0) {
+                int64_t min_time_left_ns = muldiv64(min_time_left, (s->timer_PR + 1) * 1000, cycles_per_us);
+                if(timer_pending(s->timer)) {
+                    timer_del(s->timer);
+                }
+                timer_mod(s->timer, now + min_time_left_ns);
+            }
         }
     }
 }

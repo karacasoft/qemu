@@ -60,6 +60,7 @@ struct LPC4088TimerState {
     uint64_t freq_hz;
 
 	int64_t tc_last_checked_at;
+	uint8_t next_match_interrupt;
 	
 	uint32_t timer_IR;
 	uint32_t timer_TCR;
