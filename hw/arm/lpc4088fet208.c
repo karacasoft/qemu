@@ -20,6 +20,7 @@ static const uint32_t adc_addresses[LPC4088_NR_ADCS] = {0x40034000};
 static const uint32_t dac_addresses[LPC4088_NR_DACS] = {0x4008C000};
 static const uint32_t usart_addresses[LPC4088_NR_USARTS] = {0x4000C000, 0x40010000, 0x40088000, 0x4009C000,  0x400A4000};
 	
+static const int sc_irq[LPC4088_NR_SC_IRQ] = {18, 19, 20, 21};
 static const int timer_irq[LPC4088_NR_TIMERS] = {1, 2, 3, 4};
 static const int pwm_irq[LPC4088_NR_PWMS] = {39, 9};
 static const int adc_irq[LPC4088_NR_ADCS] = {22};
@@ -124,6 +125,11 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
     }
 
     //////////////////////// SYSCON //////////////////////////////
+	DeviceState *sysconDev = DEVICE(&(s->syscon));
+	qdev_prop_set_string(sysconDev, "sc-name", names[0]);
+	qdev_prop_set_bit(sysconDev, "enable-rc", true);
+	qdev_prop_set_uint64(sysconDev, "clock-frequency", 1000000);
+	
     sysbus_realize(SYS_BUS_DEVICE(&s->syscon), &err);
     if(err != NULL)
     {
@@ -134,6 +140,11 @@ static void lpc4088fet208_realize(DeviceState *dev_soc, Error **errp) {
     
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->syscon), 1,
             qdev_get_gpio_in(dev_soc, 0));
+			
+	sysbus_connect_irq(SYS_BUS_DEVICE(&s->syscon), 2, qdev_get_gpio_in(armv7m, sc_irq[0]));
+	sysbus_connect_irq(SYS_BUS_DEVICE(&s->syscon), 3, qdev_get_gpio_in(armv7m, sc_irq[1]));
+	sysbus_connect_irq(SYS_BUS_DEVICE(&s->syscon), 4, qdev_get_gpio_in(armv7m, sc_irq[2]));
+	sysbus_connect_irq(SYS_BUS_DEVICE(&s->syscon), 5, qdev_get_gpio_in(armv7m, sc_irq[3]));
     ///////////////////////// SYSCON END /////////////////////////
 	
     //////////////////////// IOCON //////////////////////////////
