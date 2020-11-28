@@ -12,9 +12,9 @@
 #include "qemu/thread.h"
 #include "qemu/queue.h"
 
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <mqueue.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 
 #include <stddef.h>
 
@@ -26,9 +26,6 @@
 typedef struct RemoteCtrlState RemoteCtrlState;
 typedef struct RemoteCtrlClass RemoteCtrlClass;
 typedef struct RemoteCtrlMessage RemoteCtrlMessage;
-
-#define REMOTE_CTRL_MQ_NAME "/qemu_rc"
-#define REMOTE_CTRL_MQ_NAME_OUT "/qemu_rc_out"
 
 typedef void (*RemoteCtrl_ReceiveMessageCallback)(RemoteCtrlState *s, RemoteCtrlMessage *data);
 typedef void (*RemoteCtrl_SendMessageFunction)(RemoteCtrlState *s, void *data, size_t size);
@@ -47,8 +44,11 @@ struct RemoteCtrlClass {
 
     RemoteCtrl_SendMessageFunction send_message;
 
-    mqd_t mqd;
-    mqd_t mqd_out;
+    int socket;
+    int client_socket;
+    struct sockaddr_in server_addr;
+    struct sockaddr_storage server_storage;
+
     QemuThread mq_thread;
     QemuMutex mq_mutex;
 

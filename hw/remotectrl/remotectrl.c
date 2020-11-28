@@ -15,7 +15,13 @@
 #include "qemu/log.h"
 #include "qemu/main-loop.h"
 
+#include <zlib.h>
+
 #define REMOTE_CTRL_MESSAGE_MAGIC 0xDEADBEEB
+// Big endian order is default for network byte ordering.
+#define REMOTE_CTRL_MESSAGE_MAGIC_SEQUENCE ((uint8_t []){ 0xDE, 0xAD, 0xBE, 0xEB })
+
+#define REMOTE_CTRL_TCP_PORT 6942
 
 #define DEBUG_REMOTE_CTRL 1
 
@@ -41,44 +47,99 @@ static void remote_ctrl_default_callback(RemoteCtrlState *s, RemoteCtrlMessage *
             "the developer if you see this message.\n", __func__);
 }
 
+static void remote_ctrl_message_hton(RemoteCtrlMessage *msg) {
+    msg->magic = htonl(msg->magic);
+    msg->cmd = htonl(msg->cmd);
+    msg->arg1 = htonl(msg->arg1);
+    msg->arg2 = htonl(msg->arg2);
+    msg->arg3 = htonl(msg->arg3);
+    msg->arg4 = htonl(msg->arg4);
+    msg->arg5 = htonl(msg->arg5);
+    msg->arg6 = htonl(msg->arg6);
+}
+
 static void remote_ctrl_default_send_message(RemoteCtrlState *s, void *data, size_t size)
 {
     RemoteCtrlClass *rcc = REMOTE_CTRL_GET_CLASS(s);
-    if(rcc->mqd_out != -1)
+    uint8_t *data_cp = malloc((size) * sizeof(uint8_t));
+    memcpy(data_cp, data, size);
+    RemoteCtrlMessage *msg = (RemoteCtrlMessage *) data_cp;
+
+    remote_ctrl_message_hton(msg);
+    uint32_t crc = htonl((uint32_t) crc32(0, data_cp, 32));
+
+    if(rcc->client_socket != -1)
     {
         qemu_mutex_lock(&rcc->mq_mutex);
-        mq_send(rcc->mqd_out, data, size, 1);
+        send(rcc->client_socket, data_cp, 32, 0);
+        send(rcc->client_socket, (void *)&crc, 4, 0);
         qemu_mutex_unlock(&rcc->mq_mutex);
     }
+    free(data_cp);
+}
+
+static bool remote_ctrl_check_magic_nr_sequence(RemoteCtrlClass *rcc) {
+    char buffer[1];
+    uint8_t i;
+    for(i = 0; i < 4;) {
+        ssize_t ret = recv(rcc->client_socket, buffer, 1, MSG_WAITALL);
+        if(ret != 1) {
+            // TODO maybe check if the socket is closed
+        /*    DPRINTF("closed lol");
+            close(rcc->client_socket);
+            rcc->client_socket = -1;
+            return false;*/
+        } else {
+            if((uint8_t) (buffer[0]) == REMOTE_CTRL_MESSAGE_MAGIC_SEQUENCE[i]) {
+                i++;
+            } else {
+                i = 0;
+            }
+        }
+    }
+    return true;
+}
+
+static void remote_ctrl_message_ntoh(RemoteCtrlMessage *msg) {
+    msg->magic = ntohl(msg->magic);
+    msg->cmd = ntohl(msg->cmd);
+    msg->arg1 = ntohl(msg->arg1);
+    msg->arg2 = ntohl(msg->arg2);
+    msg->arg3 = ntohl(msg->arg3);
+    msg->arg4 = ntohl(msg->arg4);
+    msg->arg5 = ntohl(msg->arg5);
+    msg->arg6 = ntohl(msg->arg6);
 }
 
 static void *remote_ctrl_receive_message_thread(void *arg)
 {
     RemoteCtrlClass *rcc = (RemoteCtrlClass *) arg;
-    char buffer[32];
+    char buffer[36];
     RemoteCtrlMessage *msg = (RemoteCtrlMessage *) buffer;
 
-    while(rcc->mqd != -1)
+    while(rcc->socket != -1)
     {
-        int res = mq_receive(rcc->mqd, buffer, 32, NULL);
-        if(res < 0)
+        while(rcc->client_socket == -1)
         {
-            qemu_log_mask(LOG_GUEST_ERROR, "%s: Remote ctrl message receive error"
-                    "\n", __func__);
+            socklen_t addr_size = sizeof rcc->server_storage;
+            rcc->client_socket = accept(rcc->socket, (struct sockaddr *)&rcc->server_storage, &addr_size);
         }
-        if(res != 32)
-        {
+        if(remote_ctrl_check_magic_nr_sequence(rcc)) {
+            msg->magic = htonl(REMOTE_CTRL_MESSAGE_MAGIC);
+            ssize_t ret = recv(rcc->client_socket, buffer + 4, 32, MSG_WAITALL);
+            if(ret == 32) {
+                unsigned long crc = crc32(0, (uint8_t *) buffer, 32);
+                if((uint32_t)crc == ntohl(*((uint32_t *) (buffer+32)))) {
+                    remote_ctrl_message_ntoh(msg);
+                    CallbackEntry *cb;
+                    QLIST_FOREACH(cb, &rcc->callbacks, entries)
+                    {
+                        cb->callback(cb->dev, msg);
+                    }
+                }
+            }
+        } else {
             continue;
-        }
-        if(msg->magic != REMOTE_CTRL_MESSAGE_MAGIC)
-        {
-            qemu_log_mask(LOG_GUEST_ERROR, "%s: Remote ctrl message integrity check failed"
-                    "\n", __func__);
-        }
-        CallbackEntry *cb;
-        QLIST_FOREACH(cb, &rcc->callbacks, entries)
-        {
-            cb->callback(cb->dev, msg);
         }
     }
     return NULL;
@@ -124,33 +185,52 @@ static void remote_ctrl_class_init(ObjectClass *klass, void *class_data)
     dc->unrealize = remote_ctrl_unrealize;
     device_class_set_props(dc, remote_ctrl_properties);
     
+    
 
-    // TODO initialize POSIX message queue
-    struct mq_attr remote_ctrl_mq_attr = {
-        .mq_curmsgs = 0,
-        .mq_maxmsg = 10,
-        .mq_msgsize = 32,
-        .mq_flags = 0,
-    };
-    mq_unlink(REMOTE_CTRL_MQ_NAME);
-    mqd_t mqd = mq_open(REMOTE_CTRL_MQ_NAME,
-            O_RDONLY | O_CREAT | __O_CLOEXEC,
-            S_IRUSR | S_IWUSR, &remote_ctrl_mq_attr);
-    mqd_t mqd_out = mq_open(REMOTE_CTRL_MQ_NAME_OUT,
-            O_WRONLY | O_CREAT | __O_CLOEXEC | O_NONBLOCK,
-            S_IRUSR | S_IWUSR, &remote_ctrl_mq_attr);
-    if(mqd == -1 || mqd_out == -1) {
-        DPRINTF("POSIX message queue cannot be opened\n");
-        DPRINTF("%s\n", strerror(errno));
-        rcc->mqd = -1;
-        rcc->mqd_out = -1;
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: Remote ctrl message queue cannot be opened"
-                    "\n", __func__);
-        return;
+    while(1) {
+        rcc->socket = socket(AF_INET, SOCK_STREAM, 0);
+        rcc->client_socket = -1;
+
+        if(rcc->socket == -1) {
+            DPRINTF("Socket cannot be opened\n");
+            DPRINTF("%s\n", strerror(errno));
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: Remote ctrl socket cannot be opened"
+                        "\n", __func__);
+            continue;
+        }
+        break;
     }
+    while(1) {
+        rcc->server_addr.sin_family = AF_INET;
+        rcc->server_addr.sin_port = htons(REMOTE_CTRL_TCP_PORT);
+        rcc->server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        memset(rcc->server_addr.sin_zero, '\0', sizeof (rcc->server_addr.sin_zero));
+
+        int ret = bind(rcc->socket, (struct sockaddr *)&rcc->server_addr, sizeof(rcc->server_addr));
+        
+        if(ret == -1) {
+            DPRINTF("TCP port cannot be opened\n");
+            DPRINTF("%s\n", strerror(errno));
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: Remote ctrl socket cannot be opened"
+                        "\n", __func__);
+            continue;
+        }
+        break;
+    }
+    while(1)
+    {
+        int ret = listen(rcc->socket, 1);
+        if(ret != 0) {
+            DPRINTF("Cannot listen port\n");
+            DPRINTF("%s\n", strerror(errno));
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: Remote ctrl socket cannot be opened"
+                        "\n", __func__);
+            continue;
+        }
+        break;
+    }
+
     qemu_mutex_init(&rcc->mq_mutex);
-    rcc->mqd = mqd;
-    rcc->mqd_out = mqd_out;
     qemu_thread_create(&rcc->mq_thread, "rcc-mq", remote_ctrl_receive_message_thread,
             (void *)rcc, QEMU_THREAD_JOINABLE);
 }
