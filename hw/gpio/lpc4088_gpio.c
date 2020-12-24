@@ -17,7 +17,7 @@
 #include "trace.h"
 
 #ifndef DEBUG_LPC4088_GPIO
-#define DEBUG_LPC4088_GPIO 0
+#define DEBUG_LPC4088_GPIO 1
 #endif
 
 #define REMOTE_CTRL_GPIO_MAGIC 0xDEADBEE2
@@ -129,7 +129,7 @@ static uint64_t lpc4088_gpio_read(void *opaque, hwaddr offset, unsigned size)
     }
 
     trace_lpc4088_gpio_read(offset, reg_value);
-    DPRINTF("(%s) = 0x%" PRIx32 "\n", lpc4088_gpio_reg_name(offset), reg_value);
+    DPRINTF("[Read from GPIO%c](%s) = 0x%" PRIx32 "\n", s->port_name[0], lpc4088_gpio_reg_name(offset), reg_value);
 
     return reg_value;
 }
@@ -139,7 +139,7 @@ static void lpc4088_gpio_write(void *opaque, hwaddr offset, uint64_t value,
 {
     LPC4088GPIOPortState *s = LPC4088_GPIO_PORT(opaque);
 
-    DPRINTF("(%s, value = 0x%" PRIx32 ")\n", lpc4088_gpio_reg_name(offset),
+    DPRINTF("[Write to GPIO%c](%s, value = 0x%" PRIx32 ")\n", s->port_name[0], lpc4088_gpio_reg_name(offset),
             (uint32_t) value);
 
     
@@ -184,7 +184,6 @@ static bool lpc4088_gpio_memory_op_accepts(
 
     if(!(s->sc->sc_PCONP & LPC4088_PCONP_GPIO_MASK)) {
         qemu_irq_pulse(s->sc->hard_fault_irq);
-        DPRINTF("wowow\n");
         return false;
     }
     return true;

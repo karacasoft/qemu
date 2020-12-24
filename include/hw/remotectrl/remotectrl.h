@@ -12,8 +12,12 @@
 #include "qemu/thread.h"
 #include "qemu/queue.h"
 
+#ifdef __MINGW64__
+#include <winsock2.h>
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
+#endif
 
 
 #include <stddef.h>

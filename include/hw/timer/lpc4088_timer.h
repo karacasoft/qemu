@@ -56,6 +56,7 @@ struct LPC4088TimerState {
 	char *timer_name;
 	bool check_syscon;
     bool enable_rc;
+	bool enable_debug_print;
 	
     uint64_t freq_hz;
 

@@ -217,47 +217,49 @@ static uint32_t lpc4088_adc_generate_value(LPC4088ADCState *s)
 static uint64_t lpc4088_adc_read(void *opaque, hwaddr offset, unsigned int size)
 {
     LPC4088ADCState *s = opaque;
+	uint32_t read_val;
 
     switch (offset) {
     case LPC4088_ADC_REG_CR:
-        return s->adc_CR;
+        read_val = s->adc_CR;
     case LPC4088_ADC_REG_GDR:
 		s->adc_GDR = s->adc_GDR & ~(1 << 31);
-        return s->adc_GDR;
+        read_val = s->adc_GDR;
 	case LPC4088_ADC_REG_INTEN:
-        return s->adc_INTEN;
+        read_val = s->adc_INTEN;
 	case LPC4088_ADC_REG_DR0:
 		s->adc_DR0 = s->adc_DR0 & ~(1 << 31);
-        return s->adc_DR0;
+        read_val = s->adc_DR0;
 	case LPC4088_ADC_REG_DR1:
 		s->adc_DR1 = s->adc_DR1 & ~(1 << 31);
-        return s->adc_DR1;
+        read_val = s->adc_DR1;
 	case LPC4088_ADC_REG_DR2:
-		DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_adc_register_name(offset), (uint32_t) s->adc_DR2);
 		s->adc_DR2 = s->adc_DR2 & ~(1 << 31);
-        return s->adc_DR2;
+        read_val = s->adc_DR2;
 	case LPC4088_ADC_REG_DR3:
 		s->adc_DR3 = s->adc_DR3 & ~(1 << 31);
-        return s->adc_DR3;
+        read_val = s->adc_DR3;
 	case LPC4088_ADC_REG_DR4:
 		s->adc_DR4 = s->adc_DR4 & ~(1 << 31);
-        return s->adc_DR4;
+        read_val = s->adc_DR4;
 	case LPC4088_ADC_REG_DR5:
 		s->adc_DR5 = s->adc_DR5 & ~(1 << 31);
-        return s->adc_DR5;
+        read_val = s->adc_DR5;
 	case LPC4088_ADC_REG_DR6:
 		s->adc_DR6 = s->adc_DR6 & ~(1 << 31);
-        return s->adc_DR6;
+        read_val = s->adc_DR6;
 	case LPC4088_ADC_REG_DR7:
 		s->adc_DR7 = s->adc_DR7 & ~(1 << 31);
-        return s->adc_DR7;
+        read_val = s->adc_DR7;
 	case LPC4088_ADC_REG_STAT:
-        return s->adc_STAT;
+        read_val = s->adc_STAT;
 	case LPC4088_ADC_REG_ADTRM:
-        return s->adc_ADTRM;
+        read_val = s->adc_ADTRM;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, offset);
     }
+
+	DEBUG_PRINT("[Read from ADC%c](%s, value = 0x%" PRIx32 ")\n", s->adc_name[0], lpc4088_adc_register_name(offset), (uint32_t) read_val);
 
     return 0;
 }
@@ -268,7 +270,7 @@ static void lpc4088_adc_write(void *opaque, hwaddr offset, uint64_t val64, unsig
 	//int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
     //uint32_t timer_val = 0;
 
-	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_adc_register_name(offset), (uint32_t) value);
+	DEBUG_PRINT("[Write to ADC%c](%s, value = 0x%" PRIx32 ")\n", s->adc_name[0], lpc4088_adc_register_name(offset), (uint32_t) value);
 
     switch (offset) {
     case LPC4088_ADC_REG_CR:

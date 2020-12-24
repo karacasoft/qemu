@@ -9,7 +9,7 @@
 #include "qemu/main-loop.h"
 
 #ifndef LPC4088_TIMER_ERROR_DEBUG
-#define LPC4088_TIMER_ERROR_DEBUG 0
+#define LPC4088_TIMER_ERROR_DEBUG 1
 #endif
 
 #define DEBUG_PRINT(fmt, args...) if(LPC4088_TIMER_ERROR_DEBUG) {fprintf(stderr, "[%s->%s]:" fmt, TYPE_LPC4088_TIMER,__func__, ##args);}
@@ -338,8 +338,9 @@ static void lpc4088_timer_set_alarm(LPC4088TimerState *s) {
             selected_mr = 3;
         }
         s->next_match_interrupt = selected_mr;
-
+#ifndef __MINGW64__
         DEBUG_PRINT("Min time left: %ld\n", min_time_left);
+#endif
         if(min_time_left != 0x7FFFFFFFFFFFFFFF) {
             if(min_time_left <= 0) {
                 s->tc_last_checked_at = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
@@ -382,6 +383,7 @@ static void lpc4088_timer_reset(DeviceState *dev) {
 
 static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset, unsigned size) {
     LPC4088TimerState *s = opaque;
+    uint32_t read_val;
 
     if(s->check_syscon &&
         (((s->timer_name[0] == '0') && !(s->syscon->sc_PCONP & (1 << 1))) ||
@@ -394,48 +396,52 @@ static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset, unsigned size) {
 
     switch (offset) {
     case LPC4088_TIMER_REG_IR:
-        return s->timer_IR;
+        read_val = s->timer_IR;
     case LPC4088_TIMER_REG_TCR:
-        return s->timer_TCR;
+        read_val = s->timer_TCR;
     case LPC4088_TIMER_REG_TC:
         if(s->timer_TCR & 0x2) {
-            return 0;
+            read_val = 0;
         } else if(s->timer_TCR & 0x1) {
             lpc4088_timer_update_tc(s);
         }
         s->tc_last_checked_at = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
-        DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_timer_register_name(offset), (uint32_t) s->timer_TC);
-        return s->timer_TC;
+        read_val = s->timer_TC;
     case LPC4088_TIMER_REG_PR:
-        return s->timer_PR;
+        read_val = s->timer_PR;
     case LPC4088_TIMER_REG_PC:
-        DEBUG_PRINT("PC is not emulated correctly. Reading PC may present inconsistent results.\n");
-        return s->timer_PC;
+        DEBUG_PRINT("PC is not emulated correctly. Reading PC may produce inconsistent results.\n");
+        read_val = s->timer_PC;
     case LPC4088_TIMER_REG_MCR:
-        return s->timer_MCR;
+        read_val = s->timer_MCR;
     case LPC4088_TIMER_REG_MR0:
-        return s->timer_MR0;
+        read_val = s->timer_MR0;
     case LPC4088_TIMER_REG_MR1:
-        return s->timer_MR1;
+        read_val = s->timer_MR1;
     case LPC4088_TIMER_REG_MR2:
-        return s->timer_MR2;
+        read_val = s->timer_MR2;
     case LPC4088_TIMER_REG_MR3:
-        return s->timer_MR3;
+        read_val = s->timer_MR3;
     case LPC4088_TIMER_REG_CCR:
-        return s->timer_CCR;
+        read_val = s->timer_CCR;
     case LPC4088_TIMER_REG_CC0:
-        return s->timer_CC0;
+        read_val = s->timer_CC0;
     case LPC4088_TIMER_REG_CC1:
-        return s->timer_CC1;
+        read_val = s->timer_CC1;
     case LPC4088_TIMER_REG_EMR:
-        return s->timer_EMR;
+        read_val = s->timer_EMR;
     case LPC4088_TIMER_REG_CTCR:
-        return s->timer_CTCR;
+        read_val = s->timer_CTCR;
     default:
         qemu_log_mask(LOG_GUEST_ERROR,"%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
     }
 
-    return 0;
+    if(s->enable_debug_print) DEBUG_PRINT("[Read from TIMER%c](%s, value = 0x%" PRIx32 ")\n",
+            s->timer_name[0],
+            lpc4088_timer_register_name(offset),
+            (uint32_t) s->timer_TC);
+
+    return read_val;
 }
 
 static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, unsigned size) {
@@ -453,7 +459,10 @@ static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, uns
 
     lpc4088_timer_remote_ctrl_send_register(s, offset, value);
     
-    DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_timer_register_name(offset), (uint32_t) value);
+    if(s->enable_debug_print) DEBUG_PRINT("[Write to TIMER%c](%s, value = 0x%" PRIx32 ")\n",
+            s->timer_name[0],
+            lpc4088_timer_register_name(offset), 
+            (uint32_t) value);
 
     switch (offset) {
     case LPC4088_TIMER_REG_IR:
@@ -467,12 +476,14 @@ static void lpc4088_timer_write(void *opaque, hwaddr offset, uint64_t val64, uns
     case LPC4088_TIMER_REG_TC:
         lpc4088_timer_update_tc(s);
         s->timer_TC = value;
+        lpc4088_timer_set_alarm(s);
         return;
     case LPC4088_TIMER_REG_PR:
         s->timer_PR = value;
+        lpc4088_timer_set_alarm(s);
         return;
     case LPC4088_TIMER_REG_PC:
-        DEBUG_PRINT("PC is not emulated correctly. Writing to PC may present inconsistent results.\n");
+        DEBUG_PRINT("PC is not emulated correctly. Writing to PC may produce inconsistent results.\n");
         s->timer_PC = value;
         return;
     case LPC4088_TIMER_REG_MCR:
@@ -643,6 +654,7 @@ static Property lpc4088_timer_properties[] = {
     DEFINE_PROP_UINT64("clock-frequency", LPC4088TimerState, freq_hz, LPC4088_TIMER_FREQUENCY),
     DEFINE_PROP_STRING("timer-name", LPC4088TimerState, timer_name),
     DEFINE_PROP_BOOL("enable-rc", LPC4088TimerState, enable_rc, false),
+    DEFINE_PROP_BOOL("enable-debug-print", LPC4088TimerState, enable_debug_print, true),
     DEFINE_PROP_LINK("syscon", LPC4088TimerState, syscon, TYPE_LPC4088_SC, LPC4088SCState *),
     DEFINE_PROP_END_OF_LIST(),
 };

@@ -141,7 +141,7 @@ static bool all_cpu_threads_idle(void)
 
 static bool icount_sleep = true;
 /* Arbitrarily pick 1MIPS as the minimum allowable speed.  */
-#define MAX_ICOUNT_SHIFT 10
+#define MAX_ICOUNT_SHIFT 100
 
 typedef struct TimersState {
     /* Protected by BQL.  */

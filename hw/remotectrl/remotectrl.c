@@ -165,6 +165,14 @@ static void remote_ctrl_realize(DeviceState *ds, Error **errp)
 static void remote_ctrl_unrealize(DeviceState *ds)
 {
     RemoteCtrlState *rcs = REMOTE_CTRL(ds);
+    RemoteCtrlClass *rcc = REMOTE_CTRL_GET_CLASS(ds);
+
+    if(rcc->client_socket != -1) {
+        shutdown(rcc->client_socket, SHUT_RDWR);
+    }
+    if(rcc->socket != -1) {
+        shutdown(rcc->socket, SHUT_RDWR);
+    }
 
     CallbackEntry *entry = rcs->entry;
     QLIST_REMOVE(entry, entries);

@@ -40,17 +40,19 @@ static void lpc4088_dac_reset(DeviceState *dev) {
 
 static uint64_t lpc4088_dac_read(void *opaque, hwaddr offset, unsigned int size) {
     LPC4088DACState *s = opaque;
+    uint32_t read_val;
 
     switch (offset) {
     case LPC4088_DAC_REG_CR:
-        return s->dac_CR;
+        read_val = s->dac_CR;
     case LPC4088_DAC_REG_CTRL:
-        return s->dac_CTRL;
+        read_val = s->dac_CTRL;
 	case LPC4088_DAC_REG_CNTVAL:
-        return s->dac_CNTVAL;
+        read_val = s->dac_CNTVAL;
     default:
         qemu_log_mask(LOG_GUEST_ERROR,"%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, offset);
     }
+    DEBUG_PRINT("[Read from DAC%c](%s, value = 0x%" PRIx32 ")\n", s->dac_name[0], lpc4088_dac_register_name(offset), read_val)
 
     return 0;
 }
@@ -59,7 +61,7 @@ static void lpc4088_dac_write(void *opaque, hwaddr offset, uint64_t val64, unsig
     LPC4088DACState *s = opaque;
     uint32_t value = (uint32_t) val64;
 	
-	DEBUG_PRINT("(%s, value = 0x%" PRIx32 ")\n",lpc4088_dac_register_name(offset), (uint32_t) offset);
+	DEBUG_PRINT("[Write to DAC%c](%s, value = 0x%" PRIx32 ")\n", s->dac_name[0], lpc4088_dac_register_name(offset), (uint32_t) value);
 
     switch (offset) {
     case LPC4088_DAC_REG_CR:
