@@ -153,6 +153,7 @@ static uint64_t lpc4088_pwm_read(void *opaque, hwaddr offset, unsigned size) {
     case LPC4088_PWM_REG_CC1:
     case LPC4088_PWM_REG_CTCR:
         read_val = ops->read(opaque, offset, size);
+        break;
     case LPC4088_PWM_REG_MR0:
     case LPC4088_PWM_REG_MR1:
     case LPC4088_PWM_REG_MR2:
@@ -162,28 +163,34 @@ static uint64_t lpc4088_pwm_read(void *opaque, hwaddr offset, unsigned size) {
         } else {
             read_val = ops->read(opaque, offset, size);
         }
+        break;
     case LPC4088_PWM_REG_MR4:
         if(ts->timer_TCR & (1 << 3)) {
             read_val = s->pwm_shadow_mr[4];
         } else {
             read_val = s->pwm_MR4;
         }
+        break;
     case LPC4088_PWM_REG_MR5:
         if(ts->timer_TCR & (1 << 3)) {
             read_val = s->pwm_shadow_mr[5];
         } else {
             read_val = s->pwm_MR5;
         }
+        break;
     case LPC4088_PWM_REG_MR6:
         if(ts->timer_TCR & (1 << 3)) {
             read_val = s->pwm_shadow_mr[6];
         } else {
             read_val = s->pwm_MR6;
         }
+        break;
     case LPC4088_PWM_REG_PCR:
         read_val = s->pwm_PCR;
+        break;
     case LPC4088_PWM_REG_LER:
         read_val = s->pwm_LER;
+        break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
     }

@@ -222,39 +222,52 @@ static uint64_t lpc4088_adc_read(void *opaque, hwaddr offset, unsigned int size)
     switch (offset) {
     case LPC4088_ADC_REG_CR:
         read_val = s->adc_CR;
+		break;
     case LPC4088_ADC_REG_GDR:
 		s->adc_GDR = s->adc_GDR & ~(1 << 31);
         read_val = s->adc_GDR;
+		break;
 	case LPC4088_ADC_REG_INTEN:
         read_val = s->adc_INTEN;
+		break;
 	case LPC4088_ADC_REG_DR0:
 		s->adc_DR0 = s->adc_DR0 & ~(1 << 31);
         read_val = s->adc_DR0;
+		break;
 	case LPC4088_ADC_REG_DR1:
 		s->adc_DR1 = s->adc_DR1 & ~(1 << 31);
         read_val = s->adc_DR1;
+		break;
 	case LPC4088_ADC_REG_DR2:
 		s->adc_DR2 = s->adc_DR2 & ~(1 << 31);
         read_val = s->adc_DR2;
+		break;
 	case LPC4088_ADC_REG_DR3:
 		s->adc_DR3 = s->adc_DR3 & ~(1 << 31);
         read_val = s->adc_DR3;
+		break;
 	case LPC4088_ADC_REG_DR4:
 		s->adc_DR4 = s->adc_DR4 & ~(1 << 31);
         read_val = s->adc_DR4;
+		break;
 	case LPC4088_ADC_REG_DR5:
 		s->adc_DR5 = s->adc_DR5 & ~(1 << 31);
         read_val = s->adc_DR5;
+		break;
 	case LPC4088_ADC_REG_DR6:
 		s->adc_DR6 = s->adc_DR6 & ~(1 << 31);
         read_val = s->adc_DR6;
+		break;
 	case LPC4088_ADC_REG_DR7:
 		s->adc_DR7 = s->adc_DR7 & ~(1 << 31);
         read_val = s->adc_DR7;
+		break;
 	case LPC4088_ADC_REG_STAT:
         read_val = s->adc_STAT;
+		break;
 	case LPC4088_ADC_REG_ADTRM:
         read_val = s->adc_ADTRM;
+		break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, offset);
     }

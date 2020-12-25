@@ -397,8 +397,10 @@ static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset, unsigned size) {
     switch (offset) {
     case LPC4088_TIMER_REG_IR:
         read_val = s->timer_IR;
+        break;
     case LPC4088_TIMER_REG_TCR:
         read_val = s->timer_TCR;
+        break;
     case LPC4088_TIMER_REG_TC:
         if(s->timer_TCR & 0x2) {
             read_val = 0;
@@ -407,31 +409,44 @@ static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset, unsigned size) {
         }
         s->tc_last_checked_at = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
         read_val = s->timer_TC;
+        break;
     case LPC4088_TIMER_REG_PR:
         read_val = s->timer_PR;
+        break;
     case LPC4088_TIMER_REG_PC:
         DEBUG_PRINT("PC is not emulated correctly. Reading PC may produce inconsistent results.\n");
         read_val = s->timer_PC;
+        break;
     case LPC4088_TIMER_REG_MCR:
         read_val = s->timer_MCR;
+        break;
     case LPC4088_TIMER_REG_MR0:
         read_val = s->timer_MR0;
+        break;
     case LPC4088_TIMER_REG_MR1:
         read_val = s->timer_MR1;
+        break;
     case LPC4088_TIMER_REG_MR2:
         read_val = s->timer_MR2;
+        break;
     case LPC4088_TIMER_REG_MR3:
         read_val = s->timer_MR3;
+        break;
     case LPC4088_TIMER_REG_CCR:
         read_val = s->timer_CCR;
+        break;
     case LPC4088_TIMER_REG_CC0:
         read_val = s->timer_CC0;
+        break;
     case LPC4088_TIMER_REG_CC1:
         read_val = s->timer_CC1;
+        break;
     case LPC4088_TIMER_REG_EMR:
         read_val = s->timer_EMR;
+        break;
     case LPC4088_TIMER_REG_CTCR:
         read_val = s->timer_CTCR;
+        break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR,"%s: Bad offset 0x%"HWADDR_PRIx"\n", __func__, offset);
     }

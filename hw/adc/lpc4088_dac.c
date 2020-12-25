@@ -45,10 +45,13 @@ static uint64_t lpc4088_dac_read(void *opaque, hwaddr offset, unsigned int size)
     switch (offset) {
     case LPC4088_DAC_REG_CR:
         read_val = s->dac_CR;
+        break;
     case LPC4088_DAC_REG_CTRL:
         read_val = s->dac_CTRL;
+        break;
 	case LPC4088_DAC_REG_CNTVAL:
         read_val = s->dac_CNTVAL;
+        break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR,"%s: Bad offset 0x%" HWADDR_PRIx "\n", __func__, offset);
     }
