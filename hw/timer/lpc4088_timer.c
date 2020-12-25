@@ -454,7 +454,7 @@ static uint64_t lpc4088_timer_read(void *opaque, hwaddr offset, unsigned size) {
     if(s->enable_debug_print) DEBUG_PRINT("[Read from TIMER%c](%s, value = 0x%" PRIx32 ")\n",
             s->timer_name[0],
             lpc4088_timer_register_name(offset),
-            (uint32_t) s->timer_TC);
+            (uint32_t) read_val);
 
     return read_val;
 }
