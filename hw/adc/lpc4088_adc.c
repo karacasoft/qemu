@@ -274,7 +274,7 @@ static uint64_t lpc4088_adc_read(void *opaque, hwaddr offset, unsigned int size)
 
 	DEBUG_PRINT("[Read from ADC%c](%s, value = 0x%" PRIx32 ")\n", s->adc_name[0], lpc4088_adc_register_name(offset), (uint32_t) read_val);
 
-    return 0;
+    return read_val;
 }
 
 static void lpc4088_adc_write(void *opaque, hwaddr offset, uint64_t val64, unsigned int size) {
